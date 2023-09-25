@@ -4,31 +4,29 @@ Core library of the NSPK(Net-Speaker) framework
 
 # Build guide
 
+NOTE: Currently we support building the project through docker container. This is
+because the dependencies among TLDK and DPDK are not quiet stable and rely on old versions.
+
 1. Create workspace directory:
+  Lets assume the project directory is:
+  ~/workspace/projects/
+
   $ mkdir NSPK
   $ cd NSPK
 
-2. Clone NSPKCore repo:
+2. Initialize NSPKCore repo:
   $ git clone git@github.com:irakr/NSPKCore.git
+  $ git submodule init
+  $ git submodule update
 
-3. Clone DPDK repo:
-  $ git clone https://github.com/DPDK/dpdk.git
+3. Now we run the actual build script.
+   This script will install and run a linux container and start the build inside it.
 
-4. Build DPDK:
-  $ sudo apt install meson build-essential python3-pyelftools libnuma-dev pkgconf
-  $ cd dpdk/
-  $ meson -Dexamples=all build             # This include examples too.
-  $ ninja -C build
-  $ cd build/
-  $ sudo ninja install
+   $ sudo -E ./setup-dev.sh
 
-5. Build NSPKCore:
-  $ export DPDK_REPO=<Path-to-DPDK-repo>
-  $ make [shared|static]
+   After this you will be in the appropriate repo directory inside an linux container.
 
-6. Binary will available at build/
-
-# Run guide
+# Run guide (TBD)
 
 1. Prepare DPDK ethernet device(s) and hugepage.
 
