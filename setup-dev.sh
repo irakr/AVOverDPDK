@@ -1,4 +1,8 @@
 #!/usr/bin/bash
+###########################################################
+# This script loads this workspace into a linux container
+# and performs the build there.
+###########################################################
 
 NSPK_WORKSPACE="/workspace/NSPK"
 RTE_TARGET=x86_64-native-linuxapp-gcc
@@ -33,11 +37,8 @@ docker_exec $NSPK_WORKSPACE  git config --global --add safe.directory $NSPK_WORK
 echo "######### Building DPDK ##########"
 docker_exec $NSPK_WORKSPACE/deps/dpdk make config T=$RTE_TARGET
 docker_exec $NSPK_WORKSPACE/deps/dpdk make -j4
-docker_exec $NSPK_WORKSPACE/deps/dpdk make install T=$RTE_TARGET
+docker_exec $NSPK_WORKSPACE/deps/dpdk make install T=$RTE_TARGET DESTDIR=/usr/local/
 
 # Build TLDK
 echo "######### Building TLDK ##########"
 docker_exec $NSPK_WORKSPACE/deps/tldk make all
-
-# Login to workspace
-docker_exec $NSPK_WORKSPACE bash
