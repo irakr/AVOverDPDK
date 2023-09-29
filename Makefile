@@ -25,12 +25,13 @@ static: build/$(APP)-static
 	ln -sf $(APP)-static build/$(APP)
 
 CC=gcc
-PC_FILE := $(shell $(PKGCONF) --path libdpdk 2>/dev/null)
+LIBS := libdpdk alsa
+PC_FILE := $(shell $(PKGCONF) --path $(LIBS) 2>/dev/null)
 INCLUDE_DIRS = -I$(PROJECT_ROOT)/include/
 CFLAGS += $(INCLUDE_DIRS)
-CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
-LDFLAGS_SHARED = $(shell $(PKGCONF) --libs libdpdk)
-LDFLAGS_STATIC = $(shell $(PKGCONF) --static --libs libdpdk)
+CFLAGS += -O3 $(shell $(PKGCONF) --cflags $(LIBS))
+LDFLAGS_SHARED = $(shell $(PKGCONF) --libs $(LIBS))
+LDFLAGS_STATIC = $(shell $(PKGCONF) --static --libs $(LIBS))
 
 ifeq ($(MAKECMDGOALS),static)
 # check for broken pkg-config
