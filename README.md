@@ -24,9 +24,14 @@ because the dependencies among TLDK and DPDK are not quiet stable and rely on ol
 4. Now we run the actual build script.
    This script will install and run a linux container and start the build inside it.
 ```
-   $ sudo -E ./setup-dev.sh
+   $ sudo -E ./build.sh --build
 ```
    After this you will be in the appropriate repo directory inside an linux container.
+
+5. To clean the build run:
+```
+   $ sudo -E ./build.sh --clean
+```
 
 # Run guide (TBD)
 
@@ -38,7 +43,7 @@ because the dependencies among TLDK and DPDK are not quiet stable and rely on ol
      $ sudo ./scripts/dpdk-scripts/dpdk-init.sh
 ```
 
-2. Run nspk-core:
+1. Run nspk-core:
 ```
 $ sudo -E ./build/nspk-core -l 1,2 -n 2
 ```
