@@ -19,25 +19,35 @@ USAGE=(
 )
 
 NSPK_ROOT=/nspk
-NSPK_WORKSPACE="${NSPK_ROOT}/workspace/NSPK"
-NSPK_INSTALL_DIR=${NSPK_ROOT}/usr/local
-INSTALL_DIR="/usr/local"
+NSPK_WORKSPACE="${NSPK_ROOT}/workspace/NSPKCore"
+NSPK_INSTALL_PREFIX="/usr/local"
+NSPK_CONT_INSTALL_DIR="$NSPK_INSTALL_PREFIX"
 RTE_TARGET="x86_64-native-linuxapp-gcc"
 IMAGE_NAME="nspk-dev"
 IMAGE_VERSION="0.1"
 CONTAINER_NAME="nspk-dev"
 
+function run_cmd()
+{
+    _cmd="${@}"
+    echo "$_cmd"
+    $_cmd
+    if [[ $? -ne 0 ]]; then
+        echo "Command failed($?)"
+        exit 1
+    fi
+}
+
 # Shorthand for my docker exec's
 function docker_exec()
 {
-    if [ $# -lt 2 ]; then
-        cmd="docker exec -it $CONTAINER_NAME ${@:2}"
-    else
-        cmd="docker exec -it -w $1 $CONTAINER_NAME ${@:2}"
+    _cmd="${@:2}"
+    echo docker exec -w $1 -it $CONTAINER_NAME bash -c \"$_cmd\"
+    docker exec -w $1 -it $CONTAINER_NAME bash -c "$_cmd"
+    if [[ $? -ne 0 ]]; then
+        echo "docker_exec command failed($?)"
+        exit 1
     fi
-
-    echo $cmd
-    $cmd
 }
 
 function _build()
@@ -55,7 +65,7 @@ function _build()
             -e RTE_SDK=$NSPK_WORKSPACE/deps/dpdk \
             -e RTE_TARGET=x86_64-native-linuxapp-gcc \
             -v "$(pwd)":$NSPK_WORKSPACE \
-            -v $INSTALL_DIR:$NSPK_INSTALL_DIR \
+            -v $NSPK_INSTALL_PREFIX:$NSPK_INSTALL_PREFIX \
             --name $CONTAINER_NAME $IMAGE_NAME:$IMAGE_VERSION
     fi
 
@@ -67,13 +77,13 @@ function _build()
     # Build dependency DPDK
     echo "######### Building DPDK ##########"
     docker_exec $NSPK_WORKSPACE/deps/dpdk make config T=$RTE_TARGET
-    docker_exec $NSPK_WORKSPACE/deps/dpdk make -j4
+    docker_exec $NSPK_WORKSPACE/deps/dpdk make V=1 -j8
+    docker_exec $NSPK_WORKSPACE/deps/dpdk make install T=$RTE_TARGET DESTDIR=$NSPK_CONT_INSTALL_DIR
     docker_exec $NSPK_WORKSPACE/deps/dpdk make examples T=$RTE_TARGET
-    docker_exec $NSPK_WORKSPACE/deps/dpdk make install T=$RTE_TARGET DESTDIR=$NSPK_INSTALL_DIR
 
     # Build dependency TLDK
-    # echo "######### Building TLDK ##########"
-    # docker_exec $NSPK_WORKSPACE/deps/tldk make all
+    echo "######### Building TLDK ##########"
+    docker_exec $NSPK_WORKSPACE/deps/tldk make all
 
     # Building NSPKCore
     # TODO
@@ -91,8 +101,11 @@ function build()
     _build
     _ret=$?
     if [[ $_ret -ne 0 ]]; then
-        echo "Error(${_ret}): Build has failed. Container still exists. Please debug the issue manually" >/dev/stderr
+        echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" >/dev/stderr
+        echo "Error(${_ret}): Build has failed. Container still exists." >/dev/stderr
+        echo "Please debug the issue manually by accessing the container using below command:" >/dev/stderr
         echo "docker exec -w $NSPK_WORKSPACE -it $CONTAINER_NAME bash" >/dev/stderr
+        echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" >/dev/stderr
         return $_ret
     fi
 
@@ -107,9 +120,32 @@ function build()
 
 function clean()
 {
-    docker_exec $NSPK_WORKSPACE rm -rf build 2>/dev/null
-    docker_exec $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
-    docker_exec $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
+    cont_up=$(docker ps -a | grep "nspk-dev" | grep -o "Up" 2>/dev/null)
+
+    if [[ "$cont_up" = "Up" ]]; then
+        docker_exec $NSPK_WORKSPACE rm -rf build 2>/dev/null
+        docker_exec $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
+        docker_exec $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        docker_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
+    else
+        run_cmd rm -rf build
+        run_cmd rm -rf deps/dpdk/build
+        run_cmd rm -rf deps/tldk/build
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+    fi
+
     _clean
 }
 

@@ -1,6 +1,6 @@
 [submodule "deps/tldk"]
 	path = deps/tldk
-	url = https://github.com/FDio/tldk.git
+	url = https://github.com/irakr/tldk
 [submodule "deps/dpdk"]
 	path = deps/dpdk
-	url = https://github.com/DPDK/dpdk.git
+	url = https://github.com/irakr/dpdk
