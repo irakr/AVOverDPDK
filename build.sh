@@ -149,6 +149,12 @@ function clean()
     _clean
 }
 
+# Check docker installed or not
+if ! docker -v 2>/dev/null; then
+    echo "!!! Docker not found in your system. Please install docker first. !!!"
+    exit 1
+fi
+
 # Parse args
 VALID_ARGS=$(getopt -o bcr:: --long build,clean,rebuild:: -- "$@")
 if [[ $? -ne 0 ]]; then
