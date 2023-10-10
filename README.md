@@ -40,6 +40,11 @@ because the dependencies among TLDK and DPDK are not quiet stable and rely on ol
 ```
   This tells the build script to generate the binaries for the ubuntu VM target(value == 1).
   This is required because the of the difference in CPU flags and some other differences in hardware features.
+```
+  export TARGET_IP=<ip-of-vm>
+  export TARGET_USR=<user-in-vm>
+```
+  This tells build script to use these IP and username in the ssh command to communicate with the target VM.
 
 4. Now we run the actual build script.
    This script will install and run a linux container and start the build inside it.
@@ -51,6 +56,11 @@ because the dependencies among TLDK and DPDK are not quiet stable and rely on ol
 5. To clean the build run:
 ```
    $ sudo -E ./build.sh --clean
+```
+
+6. To deploy binaries to VM:
+```
+   $ sudo -E ./build.sh --deploy
 ```
 
 # Run guide (TBD)
