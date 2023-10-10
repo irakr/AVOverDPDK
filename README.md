@@ -21,6 +21,26 @@ because the dependencies among TLDK and DPDK are not quiet stable and rely on ol
   $ git submodule init
   $ git submodule update
 ```
+
+3. Configuration environment variables:
+```
+  $ export MY_USER=$USER
+```
+  This is your original username which will be used to chown the output build directories after completion.
+```
+  $ export NSPK_BUILD_ENV="docker"
+  or
+  $ export NSPK_BUILD_ENV="host"
+```
+  This tells the build script to either build the project in a docker container or in the host machine itself.
+```
+  $ export NSPK_VM_BUILD=1
+  or
+  $ export NSPK_VM_BUILD=0
+```
+  This tells the build script to generate the binaries for the ubuntu VM target(value == 1).
+  This is required because the of the difference in CPU flags and some other differences in hardware features.
+
 4. Now we run the actual build script.
    This script will install and run a linux container and start the build inside it.
 ```
