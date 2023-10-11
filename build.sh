@@ -125,16 +125,10 @@ function _build()
 
     # Build dependency DPDK
     echo "######### Building DPDK ##########"
-    if [ "$NSPK_VM_BUILD" = "1" ]; then
-        cmd_exec $NSPK_WORKSPACE/deps/dpdk cp -f ../tmp/dpdk/rte.cpuflags.mk mk/rte.cpuflags.mk 
-    fi
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk make config T=$RTE_TARGET
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk make V=1 -j8
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk make install -j8 T=$RTE_TARGET DESTDIR=$NSPK_CONT_INSTALL_DIR
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk make examples -j8 T=$RTE_TARGET
-    if [ "$NSPK_VM_BUILD" = "1" ]; then
-        cmd_exec $NSPK_WORKSPACE/deps/dpdk git checkout mk/rte.cpuflags.mk 
-    fi
+
+    cmd_exec $NSPK_WORKSPACE/deps/dpdk meson -Dexamples=all build --prefix=$NSPK_INSTALL_PREFIX
+    cmd_exec $NSPK_WORKSPACE/deps/dpdk ninja -C build
+    cmd_exec $NSPK_WORKSPACE/deps/dpdk/build ninja install
 
     # Build dependency TLDK
     echo "######### Building TLDK ##########"
