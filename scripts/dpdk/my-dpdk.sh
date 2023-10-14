@@ -1,0 +1,8 @@
+# MAC address of enp0s8 is 08:00:27:c1:62:c6
+KERN_NET_DRV=e1000
+#PMD_MODULE=vfio-pci
+PMD_MODULE=uio_pci_generic
+ETH_INTERFACE=enp0s8
+ETH_DEV=0000:00:08.0
+HUGE_PAGE_SIZE=4G
+
