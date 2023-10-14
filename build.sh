@@ -136,7 +136,7 @@ function _build()
 
     # Building NSPKCore
     echo "######### Building NSPKCore ##########"
-    # make all
+    make all
 }
 
 function _clean()
@@ -177,6 +177,7 @@ function build()
 function deploy()
 {
     run_cmd rsync --progress -avz $NSPK_INSTALL_PREFIX/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX
+    run_cmd rsync --progress -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
 }
 
 function clean()
@@ -185,9 +186,11 @@ function clean()
 
     if [[ "$NSPK_BUILD_ENV" = "docker" ]] && [[ "$cont_up" = "Up" ]]; then
         cmd_exec $NSPK_WORKSPACE rm -rf build 2>/dev/null
+        cmd_exec $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
+        cmd_exec $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
         cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
@@ -202,11 +205,13 @@ function clean()
         cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
     else
         run_cmd rm -rf build
+        run_cmd cd deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
         run_cmd rm -rf deps/dpdk/build
         run_cmd rm -rf deps/dpdk/$RTE_TARGET
         run_cmd rm -rf deps/dpdk/examples/**/$RTE_TARGET
+        run_cmd cd deps/tldk && make clean && cd $NSPK_WORKSPACE
         run_cmd rm -rf deps/tldk/build
-        run_cmd rm -rf $RTE_TARGET
+        run_cmd rm -rf deps/tldk/$RTE_TARGET
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
@@ -222,6 +227,7 @@ function clean()
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+            remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
