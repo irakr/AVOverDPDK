@@ -136,7 +136,7 @@ function _build()
 
     # Building NSPKCore
     echo "######### Building NSPKCore ##########"
-    make all
+    cmd_exec $NSPK_WORKSPACE make V=1 all
 }
 
 function _clean()
@@ -176,8 +176,9 @@ function build()
 
 function deploy()
 {
-    run_cmd rsync --progress -avz $NSPK_INSTALL_PREFIX/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX
-    run_cmd rsync --progress -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
+    run_cmd rsync --progress --copy-dirlinks -avz $NSPK_INSTALL_PREFIX/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX
+    run_cmd rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
+    run_cmd rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/build/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
 }
 
 function clean()
@@ -186,7 +187,9 @@ function clean()
 
     if [[ "$NSPK_BUILD_ENV" = "docker" ]] && [[ "$cont_up" = "Up" ]]; then
         cmd_exec $NSPK_WORKSPACE rm -rf build 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
+        if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
+            cmd_exec $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
+        fi
         cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
         cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
@@ -202,10 +205,13 @@ function clean()
         cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
         cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
         cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
         cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
     else
         run_cmd rm -rf build
-        run_cmd cd deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
+        if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
+            run_cmd cd $NSPK_WORKSPACE/deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
+        fi
         run_cmd rm -rf deps/dpdk/build
         run_cmd rm -rf deps/dpdk/$RTE_TARGET
         run_cmd rm -rf deps/dpdk/examples/**/$RTE_TARGET
@@ -221,6 +227,7 @@ function clean()
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        run_cmd rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
         run_cmd rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
         if [[ "$NSPK_VM_BUILD" = "1" ]]; then
             remote_exec rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
