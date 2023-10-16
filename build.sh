@@ -22,7 +22,9 @@ USAGE=(
 )
 
 # NSPK_BUILD_ENV may be "host" or "docker".
-NSPK_BUILD_ENV="host"
+if [ -z $NSPK_BUILD_ENV ]; then
+    NSPK_BUILD_ENV="host"
+fi
 
 # Env NSPK_VM_BUILD:
 # Value 1, for output binaries for ubuntu VM.
@@ -46,10 +48,10 @@ CONTAINER_NAME="nspk-dev"
 
 function run_cmd()
 {
-    _cmd="${@}"
+    local _cmd="${@:2}"
     echo "$_cmd"
     $_cmd
-    if [[ $? -ne 0 ]]; then
+    if [[ $? -ne 0 ]] && [[ $1 -ne 0 ]]; then
         echo "Command failed($?)"
         exit 1
     fi
@@ -57,20 +59,33 @@ function run_cmd()
 
 function remote_exec()
 {
-    _cmd="${@}"
+    local _cmd="${@:2}"
     echo "$_cmd"
     ssh $TARGET_USR@$TARGET_IP "$_cmd"
-    if [[ $? -ne 0 ]]; then
+    if [[ $? -ne 0 ]] && [[ $1 -ne 0 ]]; then
         echo "Command failed($?)"
         exit 1
     fi
 }
 
+# Check whether docker is installed.
+docker_initialized=0
+
 function docker_exec()
 {
-    echo docker exec -w $1 -it $CONTAINER_NAME bash -c \"$_cmd\"
-    docker exec -w $1 -it $CONTAINER_NAME bash -c "$_cmd"
-    if [[ $? -ne 0 ]]; then
+    # Check docker installed or not
+    if [[ $docker_initialized -eq 0 ]]; then
+        if ! docker -v 2>/dev/null; then
+            echo "!!! Docker not found in your system. Please install docker first. !!!"
+            exit 1
+        fi
+        docker_initialized=1
+    fi
+
+    local _cmd="${@:3}"
+    echo docker exec -w $2 -it $CONTAINER_NAME bash -c \"$_cmd\"
+    docker exec -w $2 -it $CONTAINER_NAME bash -c "$_cmd"
+    if [[ $? -ne 0 ]] && [[ $1 -ne 0 ]]; then
         echo "cmd_exec command failed($?)"
         echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++" >/dev/stderr
         echo "Error(${_ret}): Build has failed. Container still exists." >/dev/stderr
@@ -85,12 +100,13 @@ function docker_exec()
 # or in the host, based on the NSPK_BUILD_ENV flag.
 function cmd_exec()
 {
-    _cmd="${@:2}"
+    local _cmd="${@:3}"
     if [[ "$NSPK_BUILD_ENV" = "docker" ]]; then
-        docker_exec $1 $_cmd
+        docker_exec $1 $2 $_cmd
     elif [[ "$NSPK_BUILD_ENV" = "host" ]]; then
-        cd $1
-        run_cmd $_cmd
+        cd $2 && \
+        run_cmd $1 $_cmd && \
+        cd -
     else
         echo "ERROR: NSPK_BUILD_ENV = $NSPK_BUILD_ENV, which is not valid." >/dev/stderr
         exit 1
@@ -118,25 +134,30 @@ function _build()
         fi
 
         # Some git config when in docker container.
-        docker_exec $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE
-        docker_exec $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE/deps/dpdk
-        docker_exec $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE/deps/tldk
+        docker_exec 0 $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE
+        docker_exec 0 $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE/deps/dpdk
+        docker_exec 0 $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE/deps/tldk
     fi
 
     # Build dependency DPDK
     echo "######### Building DPDK ##########"
-
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk meson -Dexamples=all build --prefix=$NSPK_INSTALL_PREFIX
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk ninja -C build
-    cmd_exec $NSPK_WORKSPACE/deps/dpdk/build ninja install
+    if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+        cmd_exec 1 $NSPK_WORKSPACE cp -f $NSPK_WORKSPACE/deps/tmp/dpdk/meson.build $NSPK_WORKSPACE/deps/dpdk/config/x86/meson.build
+    fi
+    cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk meson -Dexamples=all build --prefix=$NSPK_INSTALL_PREFIX
+    cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk ninja -C build
+    cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk/build ninja install
+    if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
+    fi
 
     # Build dependency TLDK
     echo "######### Building TLDK ##########"
-    cmd_exec $NSPK_WORKSPACE/deps/tldk make V=1 all
+    cmd_exec 1 $NSPK_WORKSPACE/deps/tldk make V=1 all
 
     # Building NSPKCore
     echo "######### Building NSPKCore ##########"
-    cmd_exec $NSPK_WORKSPACE make V=1 all
+    cmd_exec 1 $NSPK_WORKSPACE make V=1 all
 }
 
 function _clean()
@@ -176,9 +197,9 @@ function build()
 
 function deploy()
 {
-    run_cmd rsync --progress --copy-dirlinks -avz $NSPK_INSTALL_PREFIX/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX
-    run_cmd rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
-    run_cmd rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/build/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
+    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_INSTALL_PREFIX/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX
+    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
+    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/build/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
 }
 
 function clean()
@@ -186,73 +207,73 @@ function clean()
     cont_up=$(docker ps -a | grep "nspk-dev" | grep -o "Up" 2>/dev/null)
 
     if [[ "$NSPK_BUILD_ENV" = "docker" ]] && [[ "$cont_up" = "Up" ]]; then
-        cmd_exec $NSPK_WORKSPACE rm -rf build 2>/dev/null
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf build 2>/dev/null
         if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
-            cmd_exec $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
+            cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
         fi
-        cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-        cmd_exec $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
-    else
-        run_cmd rm -rf build
-        if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
-            run_cmd cd $NSPK_WORKSPACE/deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
-        fi
-        run_cmd rm -rf deps/dpdk/build
-        run_cmd rm -rf deps/dpdk/$RTE_TARGET
-        run_cmd rm -rf deps/dpdk/examples/**/$RTE_TARGET
-        run_cmd cd deps/tldk && make clean && cd $NSPK_WORKSPACE
-        run_cmd rm -rf deps/tldk/build
-        run_cmd rm -rf deps/tldk/$RTE_TARGET
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-        run_cmd rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
+        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
+        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
         if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-            remote_exec rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+            cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
+        fi
+        cmd_exec 0 $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
+        cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
+        cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
+    else
+        run_cmd 1 rm -rf build
+        if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
+            run_cmd 0 cd $NSPK_WORKSPACE/deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
+        fi
+        run_cmd 1 rm -rf deps/dpdk/build
+        run_cmd 1 rm -rf deps/dpdk/$RTE_TARGET
+        run_cmd 1 rm -rf deps/dpdk/examples/**/$RTE_TARGET
+        if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+            cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
+        fi
+        run_cmd 0 cd deps/tldk && make clean && cd $NSPK_WORKSPACE
+        run_cmd 1 rm -rf deps/tldk/build
+        run_cmd 1 rm -rf deps/tldk/$RTE_TARGET
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+        if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
         fi
     fi
 
     _clean
 }
-
-# Check docker installed or not
-if ! docker -v 2>/dev/null; then
-    echo "!!! Docker not found in your system. Please install docker first. !!!"
-    exit 1
-fi
 
 # Parse args
 VALID_ARGS=$(getopt -o bcrd:: --long build,clean,rebuild,deploy:: -- "$@")
