@@ -29,8 +29,9 @@ CC=gcc
 LIBS := libdpdk alsa
 PC_FILE := $(shell $(PKGCONF) --path $(LIBS) 2>/dev/null)
 
+DEFINES = -DNETBE_DEBUG -DNETFE_DEBUG
 INCLUDE_DIRS = -I$(PROJECT_ROOT)/include/ -I$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/include
-CFLAGS += $(INCLUDE_DIRS) -D_GNU_SOURCE -DALLOW_EXPERIMENTAL_API
+CFLAGS += $(DEFINES) $(INCLUDE_DIRS) -D_GNU_SOURCE -DALLOW_EXPERIMENTAL_API
 CFLAGS += $(shell $(PKGCONF) --cflags $(LIBS))
 
 LDFLAGS_SHARED = -L$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/lib -ltle_dring -ltle_timer -ltle_memtank -ltle_l4p
