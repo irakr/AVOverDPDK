@@ -202,6 +202,11 @@ function deploy()
     run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/build/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
 }
 
+function deploy_examples()
+{
+    run_cmd 1 rsync --progress -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/app/l4fwd* ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
+}
+
 function clean()
 {
     cont_up=$(docker ps -a | grep "nspk-dev" | grep -o "Up" 2>/dev/null)
@@ -230,6 +235,11 @@ function clean()
         cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
         cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
         cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
         cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
     else
         run_cmd 1 rm -rf build
@@ -255,6 +265,11 @@ function clean()
         run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
         run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
         run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
         run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
         if [[ "$NSPK_VM_BUILD" = "1" ]]; then
             remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
@@ -268,6 +283,11 @@ function clean()
             remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
             remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
             remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
             remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
         fi
     fi
@@ -276,7 +296,7 @@ function clean()
 }
 
 # Parse args
-VALID_ARGS=$(getopt -o bcrd:: --long build,clean,rebuild,deploy:: -- "$@")
+VALID_ARGS=$(getopt -o bcrde:: --long build,clean,rebuild,deploy,deploy-examples:: -- "$@")
 if [[ $? -ne 0 ]]; then
     echo -e "${USAGE[@]}"
     exit 1;
@@ -311,6 +331,13 @@ while [ : ]; do
     -d | --deploy)
         echo "Deploying NSPKCore to target server ${TARGET_IP}..."
         deploy
+        ret=$?
+        break
+        # shift
+        ;;
+    -e | --deploy-examples)
+        echo "Deploying examples to target server ${TARGET_IP}..."
+        deploy_examples
         ret=$?
         break
         # shift
