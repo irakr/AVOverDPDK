@@ -296,7 +296,7 @@ function clean()
 }
 
 # Parse args
-VALID_ARGS=$(getopt -o bcrde:: --long build,clean,rebuild,deploy,deploy-examples:: -- "$@")
+VALID_ARGS=$(getopt -o bcrdea:: --long build,clean,rebuild,deploy,deploy-examples,deploy-all:: -- "$@")
 if [[ $? -ne 0 ]]; then
     echo -e "${USAGE[@]}"
     exit 1;
@@ -337,6 +337,14 @@ while [ : ]; do
         ;;
     -e | --deploy-examples)
         echo "Deploying examples to target server ${TARGET_IP}..."
+        deploy_examples
+        ret=$?
+        break
+        # shift
+        ;;
+    -e | --deploy-all)
+        echo "Deploying NSPKCore and examples to target server ${TARGET_IP}..."
+        deploy && \
         deploy_examples
         ret=$?
         break
