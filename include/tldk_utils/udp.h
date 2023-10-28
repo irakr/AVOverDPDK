@@ -456,6 +456,7 @@ netfe_tx_process_udp(uint32_t lcore, struct netfe_stream *fes)
 	uint32_t i, k, n;
 
 	/* refill with new mbufs. */
+	// IRAK: This is where we build the UDP packets.
 	pkt_buf_fill(lcore, &fes->pbuf, fes->txlen);
 
 	n = fes->pbuf.num;
@@ -465,6 +466,7 @@ netfe_tx_process_udp(uint32_t lcore, struct netfe_stream *fes)
 	/**
 	 * TODO: cannot use function pointers for unequal param num.
 	 */
+	// IRAK: Builds the UDP packet out of pkt and sends it to logical TLDK queue.
 	k = tle_udp_stream_send(fes->s, fes->pbuf.pkt, n, NULL);
 	NETFE_TRACE("%s(%u): tle_%s_stream_send(%p, %u) returns %u\n",
 		__func__, lcore, proto_name[fes->proto], fes->s, n, k);
@@ -572,8 +574,8 @@ lcore_main_udp(void *arg)
 		sig_handle(SIGQUIT);
 
 	while (force_quit == 0) {
-		netfe_lcore_udp();
-		netbe_lcore();
+		netfe_lcore_udp(); // Populate packets in the logical UDP stream.
+		netbe_lcore(); // Actually send out the packets to the NIC.
 	}
 
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u) finish\n",

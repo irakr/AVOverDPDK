@@ -87,7 +87,7 @@ fwd_tbl_init(struct netfe_lcore *fe, uint16_t family, uint32_t lcore)
 {
 	int32_t rc;
 	struct rte_hash **h;
-	struct rte_hash_parameters hprm;
+	struct rte_hash_parameters hprm={0};
 	char buf[RTE_HASH_NAMESIZE];
 
 	if (family == AF_INET) {

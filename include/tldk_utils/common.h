@@ -203,16 +203,24 @@ pkt_buf_empty(struct pkt_buf *pb)
 static inline void
 pkt_buf_fill(uint32_t lcore, struct pkt_buf *pb, uint32_t dlen)
 {
+	// @dlen -> fe.cfg -> "txlen=xx"
 	uint32_t i;
 	int32_t sid;
+	char *app_data = NULL;
 
 	sid = rte_lcore_to_socket_id(lcore) + 1;
-
+	printf("RTE_DIM(pb->pkt): %u\n", RTE_DIM(pb->pkt));
 	for (i = pb->num; i != RTE_DIM(pb->pkt); i++) {
 		pb->pkt[i] = rte_pktmbuf_alloc(mpool[sid]);
 		if (pb->pkt[i] == NULL)
 			break;
+		// Appends dlen uninitialized bytes to the pkt[i] mbuf.
 		rte_pktmbuf_append(pb->pkt[i], dlen);
+		app_data = rte_pktmbuf_mtod(pb->pkt[i], char*);
+		// app_data = rte_pktmbuf_mtod_offset(pb->pkt[i], char*, pb->pkt[i]->l4_len + pb->pkt[i]->l3_len + pb->pkt[i]->l2_len);
+		// app_data = rte_pktmbuf_mtod_offset(pb->pkt[i], char*, -(pb->pkt[i]->l4_len + pb->pkt[i]->l3_len + pb->pkt[i]->l2_len));
+		snprintf(app_data, dlen, "Hello from DPDK UDP.\r\n");
+		printf("pkt[%d].pkt_len=%u, pkt[%d].data_len=%u\n", i, pb->pkt[i]->pkt_len, i, pb->pkt[i]->data_len);
 	}
 
 	pb->num = i;
@@ -571,6 +579,7 @@ netbe_tx(struct netbe_lcore *lc, uint32_t pidx)
 	k = RTE_DIM(lc->prtq[pidx].tx_buf.pkt) - n;
 	mb = lc->prtq[pidx].tx_buf.pkt;
 
+	// If k >= Half of num of elements allocated for pkt(rte_mbuf). 
 	if (k >= RTE_DIM(lc->prtq[pidx].tx_buf.pkt) / 2) {
 		j = tle_tx_bulk(lc->prtq[pidx].dev, mb + n, k);
 		n += j;
@@ -588,6 +597,7 @@ netbe_tx(struct netbe_lcore *lc, uint32_t pidx)
 	for (j = 0; j != n; j++)
 		NETBE_PKT_DUMP(mb[j]);
 
+	// This is where we finally send out the packet to the NIC.
 	k = rte_eth_tx_burst(lc->prtq[pidx].port.id,
 			lc->prtq[pidx].txqid, mb, n);
 
