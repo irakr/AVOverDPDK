@@ -13,14 +13,6 @@
  * limitations under the License.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#include <tldk_utils/netbe.h>
 #include <tldk_utils/parse.h>
 
 #define DEF_LINE_NUM	0x400
@@ -115,6 +107,26 @@ static const struct option long_opt[] = {
 	{OPT_LONG_TXCNT, 1, 0, OPT_SHORT_TXCNT},
 	{NULL, 0, 0, 0}
 };
+
+const char *
+format_addr(const struct sockaddr_storage *sp, char buf[], size_t len)
+{
+	const struct sockaddr_in *i4;
+	const struct sockaddr_in6 *i6;
+	const void *addr;
+
+	if (sp->ss_family == AF_INET) {
+		i4 = (const struct sockaddr_in *)sp;
+		addr = &i4->sin_addr;
+	} else if (sp->ss_family == AF_INET6) {
+		i6 = (const struct sockaddr_in6 *)sp;
+		addr = &i6->sin6_addr;
+	} else
+		return NULL;
+
+
+	return inet_ntop(sp->ss_family, addr, buf, len);
+}
 
 static int
 parse_uint_val(__rte_unused const char *key, const char *val, void *prm)

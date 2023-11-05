@@ -13,60 +13,24 @@
  * limitations under the License.
  */
 
-#include <time.h>
-
-#include <tldk_utils/netbe.h>
+#include <nspk.h>
 #include <tldk_utils/parse.h>
+#include <tldk_utils/port.h>
+#include <tldk_utils/lcore.h>
+#include <tldk_utils/tcp.h>
+#include <tldk_utils/udp.h>
 
-#define	MAX_RULES	0x100
-#define	MAX_TBL8	0x800
-
-#define	RX_RING_SIZE	0x400
-#define	TX_RING_SIZE	0x800
-
-#define	MPOOL_CACHE_SIZE	0x100
-#define	MPOOL_NB_BUF		0x20000
-
-#define FRAG_MBUF_BUF_SIZE	(RTE_PKTMBUF_HEADROOM + TLE_DST_MAX_HDR)
-#define FRAG_TTL		MS_PER_S
-#define	FRAG_TBL_BUCKET_ENTRIES	16
-
-#define	FIRST_PORT	0x8000
-
-#define RX_CSUM_OFFLOAD	(DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_UDP_CKSUM)
-#define TX_CSUM_OFFLOAD	(DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_UDP_CKSUM)
+volatile int force_quit;
 
 RTE_DEFINE_PER_LCORE(struct netbe_lcore *, _be);
 RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe);
 
-#include <tldk_utils/fwdtbl.h>
+struct netbe_cfg becfg = {.mpool_buf_num=MPOOL_NB_BUF};
+struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
+struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
+char proto_name[3][10] = {"udp", "tcp", ""};
 
-/**
- * Location to be modified to create the IPv4 hash key which helps
- * to distribute packets based on the destination TCP/UDP port.
- */
-#define RSS_HASH_KEY_DEST_PORT_LOC_IPV4 15
-
-/**
- * Location to be modified to create the IPv6 hash key which helps
- * to distribute packets based on the destination TCP/UDP port.
- */
-#define RSS_HASH_KEY_DEST_PORT_LOC_IPV6 39
-
-/**
- * Size of the rte_eth_rss_reta_entry64 array to update through
- * rte_eth_dev_rss_reta_update.
- */
-#define RSS_RETA_CONF_ARRAY_SIZE (ETH_RSS_RETA_SIZE_512/RTE_RETA_GROUP_SIZE)
-
-static volatile int force_quit;
-
-static struct netbe_cfg becfg = {.mpool_buf_num=MPOOL_NB_BUF};
-static struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
-static struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
-static char proto_name[3][10] = {"udp", "tcp", ""};
-
-static const struct rte_eth_conf port_conf_default;
+const struct rte_eth_conf port_conf_default;
 
 struct tx_content tx_content = {
 	.sz = 0,
@@ -74,19 +38,12 @@ struct tx_content tx_content = {
 };
 
 /* function pointers */
-static TLE_RX_BULK_FUNCTYPE tle_rx_bulk;
-static TLE_TX_BULK_FUNCTYPE tle_tx_bulk;
-static TLE_STREAM_RECV_FUNCTYPE tle_stream_recv;
-static TLE_STREAM_CLOSE_FUNCTYPE tle_stream_close;
+TLE_RX_BULK_FUNCTYPE tle_rx_bulk;
+TLE_TX_BULK_FUNCTYPE tle_tx_bulk;
+TLE_STREAM_RECV_FUNCTYPE tle_stream_recv;
+TLE_STREAM_CLOSE_FUNCTYPE tle_stream_close;
 
-static LCORE_MAIN_FUNCTYPE lcore_main;
-
-#include <tldk_utils/common.h>
-#include <tldk_utils/parse.h>
-#include <tldk_utils/lcore.h>
-#include <tldk_utils/port.h>
-#include <tldk_utils/tcp.h>
-#include <tldk_utils/udp.h>
+LCORE_MAIN_FUNCTYPE lcore_main;
 
 int verbose = VERBOSE_NONE;
 
@@ -173,7 +130,7 @@ func_ptrs_init(uint32_t proto) {
 		tle_stream_recv = tle_tcp_stream_recv;
 		tle_stream_close = tle_tcp_stream_close;
 
-		lcore_main = lcore_main_tcp;
+		// lcore_main = lcore_main_tcp;
 
 	} else {
 		tle_rx_bulk = tle_udp_rx_bulk;
@@ -181,7 +138,7 @@ func_ptrs_init(uint32_t proto) {
 		tle_stream_recv = tle_udp_stream_recv;
 		tle_stream_close = tle_udp_stream_close;
 
-		lcore_main = lcore_main_udp;
+		// lcore_main = lcore_main_udp;
 	}
 }
 
@@ -269,17 +226,22 @@ main(int argc, char *argv[])
 	rc = (rc != 0) ? rc : netfe_lcore_fill(prm, &feprm);
 	if (rc != 0)
 		sig_handle(SIGQUIT);
-
+	
+	int rc1;
 	/* launch all slave lcores. */
 	RTE_LCORE_FOREACH_WORKER(i) {
 		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
-			rte_eal_remote_launch(lcore_main, prm + i, i);
+			rc1 = rte_eal_remote_launch(lcore_main_rtp, prm + i, i);
 	}
+	printf("Slave lcore initialized, rc1=%d.\n", rc1);
 
 	/* launch master lcore. */
 	i = rte_get_main_lcore();
-	if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
-		lcore_main(prm + i);
+	if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0) {
+		printf("Launching master lcore thread.\n");
+		rc1 = lcore_main_control(prm + i);
+	}
+	printf("Master lcore initialized, rc1=%d.\n", rc1);
 
 	rte_eal_mp_wait_lcore();
 

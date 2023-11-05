@@ -35,20 +35,20 @@ enum {
 	UDP_PTYPE = 0x40,
 };
 
-static inline uint64_t
+static uint64_t
 _mbuf_tx_offload(uint64_t il2, uint64_t il3, uint64_t il4, uint64_t tso,
 	uint64_t ol3, uint64_t ol2)
 {
 	return il2 | il3 << 7 | il4 << 16 | tso << 24 | ol3 << 40 | ol2 << 49;
 }
 
-static inline void
+static void
 fill_pkt_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t l3, uint32_t l4)
 {
 	m->tx_offload = _mbuf_tx_offload(l2, l3, l4, 0, 0, 0);
 }
 
-static inline int
+static int
 is_ipv4_frag(const struct rte_ipv4_hdr *iph)
 {
 	const uint16_t mask = rte_cpu_to_be_16(~RTE_IPV4_HDR_DF_FLAG);
@@ -56,7 +56,7 @@ is_ipv4_frag(const struct rte_ipv4_hdr *iph)
 	return ((mask & iph->fragment_offset) != 0);
 }
 
-static inline uint32_t
+static uint32_t
 get_tcp_header_size(struct rte_mbuf *m, uint32_t l2_len, uint32_t l3_len)
 {
 	const struct rte_tcp_hdr *tcp;
@@ -65,7 +65,7 @@ get_tcp_header_size(struct rte_mbuf *m, uint32_t l2_len, uint32_t l3_len)
 	return (tcp->data_off >> 4) * 4;
 }
 
-static inline void
+static void
 adjust_ipv4_pktlen(struct rte_mbuf *m, uint32_t l2_len)
 {
 	uint32_t plen, trim;
@@ -79,7 +79,7 @@ adjust_ipv4_pktlen(struct rte_mbuf *m, uint32_t l2_len)
 	}
 }
 
-static inline void
+static void
 adjust_ipv6_pktlen(struct rte_mbuf *m, uint32_t l2_len)
 {
 	uint32_t plen, trim;
@@ -93,7 +93,7 @@ adjust_ipv6_pktlen(struct rte_mbuf *m, uint32_t l2_len)
 	}
 }
 
-static inline void
+static void
 tcp_stat_update(struct netbe_lcore *lc, const struct rte_mbuf *m,
 	uint32_t l2_len, uint32_t l3_len)
 {
@@ -103,7 +103,7 @@ tcp_stat_update(struct netbe_lcore *lc, const struct rte_mbuf *m,
 	lc->tcp_stat.flags[th->tcp_flags]++;
 }
 
-static inline uint32_t
+static uint32_t
 get_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto, uint32_t frag)
 {
 	const struct rte_ipv4_hdr *iph;
@@ -127,7 +127,7 @@ get_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto, uint32_t frag)
 	return len;
 }
 
-static inline void
+static void
 fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,
 	uint32_t frag, uint32_t l4_len)
 {
@@ -138,7 +138,7 @@ fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,
 	adjust_ipv4_pktlen(m, l2);
 }
 
-static inline int
+static int
 ipv6x_hdr(uint32_t proto)
 {
 	return (proto == IPPROTO_HOPOPTS ||
@@ -149,7 +149,7 @@ ipv6x_hdr(uint32_t proto)
 		proto == IPPROTO_DSTOPTS);
 }
 
-static inline uint32_t
+static uint32_t
 get_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
 	uint32_t fproto)
 {
@@ -203,7 +203,7 @@ get_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
 	return len;
 }
 
-static inline uint32_t
+static uint32_t
 get_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto)
 {
 	const struct rte_ipv6_hdr *iph;
@@ -220,7 +220,7 @@ get_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto)
 	return 0;
 }
 
-static inline void
+static void
 fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto,
 	uint32_t l4_len)
 {
@@ -231,7 +231,7 @@ fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto,
 	adjust_ipv6_pktlen(m, l2);
 }
 
-static inline struct rte_mbuf *
+static struct rte_mbuf *
 handle_arp(struct rte_mbuf *m, struct netbe_lcore *lc, dpdk_port_t port,
 	uint32_t l2len)
 {
@@ -258,7 +258,7 @@ handle_arp(struct rte_mbuf *m, struct netbe_lcore *lc, dpdk_port_t port,
 	return NULL;
 }
 
-static inline struct rte_mbuf *
+static struct rte_mbuf *
 fill_eth_tcp_arp_hdr_len(struct rte_mbuf *m, struct netbe_lcore *lc,
 	dpdk_port_t port)
 {
@@ -309,7 +309,7 @@ fill_eth_tcp_arp_hdr_len(struct rte_mbuf *m, struct netbe_lcore *lc,
 	return m;
 }
 
-static inline void
+static void
 fill_eth_tcp_hdr_len(struct rte_mbuf *m)
 {
 	uint32_t dlen, l2_len, l3_len, l4_len;
@@ -354,7 +354,7 @@ fill_eth_tcp_hdr_len(struct rte_mbuf *m)
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 }
 
-static inline void
+static void
 fill_eth_udp_hdr_len(struct rte_mbuf *m)
 {
 	uint32_t dlen, l2_len;
@@ -395,7 +395,7 @@ fill_eth_udp_hdr_len(struct rte_mbuf *m)
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 }
 
-static inline uint16_t
+static uint16_t
 ipv4x_cksum(const void *iph, size_t len)
 {
 	uint16_t cksum;
@@ -404,7 +404,7 @@ ipv4x_cksum(const void *iph, size_t len)
 	return (cksum == 0xffff) ? cksum : ~cksum;
 }
 
-static inline void
+static void
 fix_reassembled(struct rte_mbuf *m, int32_t hwcsum, uint32_t proto)
 {
 	struct rte_ipv4_hdr *iph;
@@ -486,7 +486,7 @@ reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
 }
 
 /* exclude NULLs from the final list of packets. */
-static inline uint32_t
+static uint32_t
 compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
 {
 	uint32_t i, j, k, l;

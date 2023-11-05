@@ -48,11 +48,12 @@ CONTAINER_NAME="nspk-dev"
 
 function run_cmd()
 {
+    local severity=$1
     local _cmd="${@:2}"
     echo "$_cmd"
     $_cmd
-    if [[ $? -ne 0 ]] && [[ $1 -ne 0 ]]; then
-        echo "Command failed($?)"
+    if [[ $? -ne 0 ]] && [[ $severity -gt 0 ]]; then
+        echo "Command failed($?)" >/dev/stderr
         exit 1
     fi
 }
@@ -61,7 +62,7 @@ function remote_exec()
 {
     local _cmd="${@:2}"
     echo "$_cmd"
-    ssh $TARGET_USR@$TARGET_IP "$_cmd"
+    ssh $NSPK_TARGET_USER@$NSPK_TARGET_IP "$_cmd"
     if [[ $? -ne 0 ]] && [[ $1 -ne 0 ]]; then
         echo "Command failed($?)"
         exit 1
@@ -162,7 +163,13 @@ function _build()
 
 function _clean()
 {
-    docker stop $CONTAINER_NAME 2>/dev/null
+    if [[ "$NSPK_BUILD_ENV" != "docker" ]]; then
+        return
+    fi
+    cont_up=$(docker ps -a | grep "nspk-dev" | grep -o "Up" 2>/dev/null)
+    if [[ "$cont_up" = "Up" ]]; then
+        docker stop $CONTAINER_NAME 2>/dev/null
+    fi
     docker rm $CONTAINER_NAME 2>/dev/null
     docker image rm $IMAGE_NAME:$IMAGE_VERSION 2>/dev/null
 }
@@ -197,100 +204,149 @@ function build()
 
 function deploy()
 {
-    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_INSTALL_PREFIX/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX
-    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
-    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/build/ ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
+    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_INSTALL_PREFIX/ ${NSPK_TARGET_USER}@${NSPK_TARGET_IP}:$NSPK_INSTALL_PREFIX
+    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/lib/ ${NSPK_TARGET_USER}@${NSPK_TARGET_IP}:$NSPK_INSTALL_PREFIX/lib
+    run_cmd 1 rsync --progress --copy-dirlinks -avz $NSPK_WORKSPACE/build/ ${NSPK_TARGET_USER}@${NSPK_TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
 }
 
 function deploy_examples()
 {
-    run_cmd 1 rsync --progress -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/app/l4fwd* ${TARGET_USR}@${TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
+    run_cmd 1 rsync --progress -avz $NSPK_WORKSPACE/deps/tldk/${RTE_TARGET}/app/l4fwd* ${NSPK_TARGET_USER}@${NSPK_TARGET_IP}:$NSPK_INSTALL_PREFIX/bin
 }
 
 function clean()
 {
     cont_up=$(docker ps -a | grep "nspk-dev" | grep -o "Up" 2>/dev/null)
 
-    if [[ "$NSPK_BUILD_ENV" = "docker" ]] && [[ "$cont_up" = "Up" ]]; then
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf build 2>/dev/null
-        if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
-            cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
-        fi
-        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
-        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
-        cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
-        if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-            cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
-        fi
-        cmd_exec 0 $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
-        cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
-        cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
-        cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
-    else
-        run_cmd 1 rm -rf build
-        if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
-            run_cmd 0 cd $NSPK_WORKSPACE/deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
-        fi
-        run_cmd 1 rm -rf deps/dpdk/build
-        run_cmd 1 rm -rf deps/dpdk/$RTE_TARGET
-        run_cmd 1 rm -rf deps/dpdk/examples/**/$RTE_TARGET
-        if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-            cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
-        fi
-        run_cmd 0 cd deps/tldk && make clean && cd $NSPK_WORKSPACE
-        run_cmd 1 rm -rf deps/tldk/build
-        run_cmd 1 rm -rf deps/tldk/$RTE_TARGET
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
-        run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
-        if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
-            remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
-        fi
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf build 2>/dev/null
+    if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
+        cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
     fi
+    cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
+    cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
+    cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
+    if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+        cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
+    fi
+    cmd_exec 0 $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
+    cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
+    cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
+    if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+    fi
+
+    # if [[ "$NSPK_BUILD_ENV" = "docker" ]] && [[ "$cont_up" = "Up" ]]; then
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf build 2>/dev/null
+    #     if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
+    #         cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
+    #     fi
+    #     cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
+    #     cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
+    #     cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
+    #     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+    #         cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
+    #     fi
+    #     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
+    #     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
+    #     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
+    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
+    # else
+    #     run_cmd 1 rm -rf build
+    #     if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
+    #         run_cmd 0 cd $NSPK_WORKSPACE/deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
+    #     fi
+    #     run_cmd 1 rm -rf deps/dpdk/build
+    #     run_cmd 1 rm -rf deps/dpdk/$RTE_TARGET
+    #     run_cmd 1 rm -rf deps/dpdk/examples/**/$RTE_TARGET
+    #     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+    #         cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
+    #     fi
+    #     run_cmd 1 cd deps/tldk && make clean && cd $NSPK_WORKSPACE
+    #     run_cmd 1 rm -rf deps/tldk/build
+    #     run_cmd 1 rm -rf deps/tldk/$RTE_TARGET
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
+    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+    #     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
+    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+    #     fi
+    # fi
 
     _clean
 }
@@ -329,21 +385,21 @@ while [ : ]; do
         # shift
         ;;
     -d | --deploy)
-        echo "Deploying NSPKCore to target server ${TARGET_IP}..."
+        echo "Deploying NSPKCore to target server ${NSPK_TARGET_IP}..."
         deploy
         ret=$?
         break
         # shift
         ;;
     -e | --deploy-examples)
-        echo "Deploying examples to target server ${TARGET_IP}..."
+        echo "Deploying examples to target server ${NSPK_TARGET_IP}..."
         deploy_examples
         ret=$?
         break
         # shift
         ;;
     -e | --deploy-all)
-        echo "Deploying NSPKCore and examples to target server ${TARGET_IP}..."
+        echo "Deploying NSPKCore and examples to target server ${NSPK_TARGET_IP}..."
         deploy && \
         deploy_examples
         ret=$?

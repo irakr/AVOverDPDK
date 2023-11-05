@@ -16,7 +16,13 @@
 #ifndef __PARSE_H__
 #define __PARSE_H__
 
-#include <sched.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <nspk.h>
 
 #define PARSE_LIST_DELIM "-"
 
@@ -33,25 +39,8 @@ union parse_val {
 	rte_cpuset_t cpuset;
 };
 
-static const char *
-format_addr(const struct sockaddr_storage *sp, char buf[], size_t len)
-{
-	const struct sockaddr_in *i4;
-	const struct sockaddr_in6 *i6;
-	const void *addr;
-
-	if (sp->ss_family == AF_INET) {
-		i4 = (const struct sockaddr_in *)sp;
-		addr = &i4->sin_addr;
-	} else if (sp->ss_family == AF_INET6) {
-		i6 = (const struct sockaddr_in6 *)sp;
-		addr = &i6->sin6_addr;
-	} else
-		return NULL;
-
-
-	return inet_ntop(sp->ss_family, addr, buf, len);
-}
+const char *
+format_addr(const struct sockaddr_storage *sp, char buf[], size_t len);
 
 int parse_netbe_arg(struct netbe_port *prt, const char *arg,
 	rte_cpuset_t *pcpu);

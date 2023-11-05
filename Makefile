@@ -33,6 +33,7 @@ DEFINES = -DNETBE_DEBUG -DNETFE_DEBUG
 INCLUDE_DIRS = -I$(PROJECT_ROOT)/include/ -I$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/include
 CFLAGS += $(DEFINES) $(INCLUDE_DIRS) -D_GNU_SOURCE -DALLOW_EXPERIMENTAL_API
 CFLAGS += $(shell $(PKGCONF) --cflags $(LIBS))
+CFLAGS += -g -O0
 
 LDFLAGS_SHARED = -L$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/lib -ltle_dring -ltle_timer -ltle_memtank -ltle_l4p
 LDFLAGS_SHARED += $(shell $(PKGCONF) --libs $(LIBS))
