@@ -230,8 +230,13 @@ main(int argc, char *argv[])
 	int rc1;
 	/* launch all slave lcores. */
 	RTE_LCORE_FOREACH_WORKER(i) {
-		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
-			rc1 = rte_eal_remote_launch(lcore_main_rtp, prm + i, i);
+		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0) {
+			struct nspk_rtp_session_t *my_sess = calloc(1, sizeof(*my_sess));
+			my_sess->session_id = 0;
+			strncpy(my_sess->src.src_name, "/home/procfser/Videos/WeddingMovie.mp4", sizeof(my_sess->src.src_name));
+			my_sess->lcore_prm = prm + i;
+			rc1 = rte_eal_remote_launch(nspk_lcore_main_rtp, my_sess, i);
+		}
 	}
 	printf("Slave lcore initialized, rc1=%d.\n", rc1);
 

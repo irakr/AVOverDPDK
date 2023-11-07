@@ -4,13 +4,13 @@
 #include <sched.h>
 #include <rte_os.h>
 #include <rte_arp.h>
-#include <nspk_rtp.h>
 #include <rte_log.h>
 #include <rte_per_lcore.h>
 #include <nspk_audio.h>
 #include <nspk_control.h>
 #include <tldk_utils/netbe.h>
 #include <tldk_utils/common.h>
+#include <nspk_rtp.h>
 
 #define	MAX_RULES	0x100
 #define	MAX_TBL8	0x800

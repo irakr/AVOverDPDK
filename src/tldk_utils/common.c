@@ -192,16 +192,14 @@ pkt_buf_fill(uint32_t lcore, struct pkt_buf *pb, uint32_t dlen)
 	char *app_data = NULL;
 
 	sid = rte_lcore_to_socket_id(lcore) + 1;
-	printf("RTE_DIM(pb->pkt): %lu\n", RTE_DIM(pb->pkt));
+	printf("RTE_DIM(pb->pkt): %lu\n", RTE_DIM(pb->pkt)); // 2 * MAX_PKT_BURST = 64
 	for (i = pb->num; i != RTE_DIM(pb->pkt); i++) {
 		pb->pkt[i] = rte_pktmbuf_alloc(mpool[sid]);
 		if (pb->pkt[i] == NULL)
 			break;
-		// Appends dlen uninitialized bytes to the pkt[i] mbuf.
+		// Appends dlen uninitialized bytes to the data section of the pkt[i] mbuf.
 		rte_pktmbuf_append(pb->pkt[i], dlen);
 		app_data = rte_pktmbuf_mtod(pb->pkt[i], char*);
-		// app_data = rte_pktmbuf_mtod_offset(pb->pkt[i], char*, pb->pkt[i]->l4_len + pb->pkt[i]->l3_len + pb->pkt[i]->l2_len);
-		// app_data = rte_pktmbuf_mtod_offset(pb->pkt[i], char*, -(pb->pkt[i]->l4_len + pb->pkt[i]->l3_len + pb->pkt[i]->l2_len));
 		snprintf(app_data, dlen, "Hello from DPDK UDP.\r\n");
 		printf("pkt[%d].pkt_len=%u, pkt[%d].data_len=%u\n", i, pb->pkt[i]->pkt_len, i, pb->pkt[i]->data_len);
 	}

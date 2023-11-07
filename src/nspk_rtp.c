@@ -6,16 +6,30 @@
 #include <tldk_utils/udp.h>
 #include <tldk_utils/parse.h>
 
+static int
+nspk_rtp_generate_rtp(struct nspk_rtp_session_t *rtp_sess)
+{
+	int num_pkts = 0;
+	// TODO: Implement this function:
+	// - Read media file at rtp_sess->src through ffmpeg lib.
+	// - Parse the file and generate H264 RTP payload.
+	// - Append each payload in the mbuf at rtp_sess->fe_stream->pbuf.
+	pkt_buf_fill(rtp_sess->lcore_prm->be.lc->id, &rtp_sess->fe_stream->pbuf, 64);
+	num_pkts = 64;
+	return num_pkts;
+}
+
 // TODO
 // This thread is run by the master lcore and is currently dedicated to sending RTP stream only.
 // Later we will change the design such that this thread will dedicate to the session control thread,
 // that is when this function will be moved elsewhere.
 int
-lcore_main_rtp(void *arg)
+nspk_lcore_main_rtp(void *arg)
 {
     int i;
 	int32_t rc = 0;
 	uint32_t lcore;
+	struct nspk_rtp_session_t *rtp_sess = (struct nspk_rtp_session_t*)arg;
 	struct lcore_prm *prm;
     struct netfe_stream *fs;
     struct netfe_sprm *sprm;
@@ -24,7 +38,7 @@ lcore_main_rtp(void *arg)
     char ip_addr[INET_ADDRSTRLEN];
     struct netfe_lcore *fe;
 
-	prm = arg;
+	prm = rtp_sess->lcore_prm;
 	lcore = rte_lcore_id();
 
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u) start\n",
@@ -35,15 +49,16 @@ lcore_main_rtp(void *arg)
 		fs = netfe_lcore_init_udp(&prm->fe);
 		if (fs == NULL) {
 			fprintf(stderr, "Error: failed to init UDP stream.\n");
-			return NULL;
+			return EFAULT;
 		}
 		printf("FE stream laddr=%s, raddr=%s\n",
             format_addr((struct sockaddr_storage*)&fs->laddr, ip_addr, sizeof(fs->laddr)),
 			format_addr((struct sockaddr_storage*)&fs->raddr, ip_addr, sizeof(fs->raddr)));
+		rtp_sess->fe_stream = fs;
 	}
 
 	/* lcore BE init. */
-	if (rc == 0 && prm->be.lc != NULL)
+	if (prm->be.lc != NULL)
 		rc = netbe_lcore_setup(prm->be.lc);
 
 	if (rc != 0)
@@ -80,7 +95,8 @@ lcore_main_rtp(void *arg)
 
 	RTE_LOG(NOTICE, USER1, "%s (lcore=%u) Starting RTP session...\n",
 		__func__, lcore);
-
+	printf("Session ID: %d, RTP source %s: %s\n",
+		rtp_sess->session_id, (rtp_sess->src.src_type == FILE_SRC) ? "file" : "device", rtp_sess->src.src_name);
 	while (force_quit == 0) {
 		// TODO: Understand the event API.
         // tle_event_raise(fs->txev);
@@ -89,8 +105,13 @@ lcore_main_rtp(void *arg)
         // TODO:
         // Build a burst of RTP packets from the opened media file.
         // Write a test RTP packet into the UDP TX queue.
-        pkt_buf_fill(lcore, &fs->pbuf, 64);
-		
+		int num_pkt;
+		if ((num_pkt = nspk_rtp_generate_rtp(rtp_sess)) <= 0) {
+			fprintf(stderr, "Error: No RTP packets generated to mbuf.\n");
+			continue;
+		}
+		printf("Generated %d RTP packets to mbuf.\n", num_pkt);
+
 		// FE send
 		netfe_tx_process_udp(lcore, fs);
 
