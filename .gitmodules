@@ -4,3 +4,6 @@
 [submodule "deps/dpdk"]
 	path = deps/dpdk
 	url = https://github.com/irakr/dpdk
+[submodule "deps/FFmpeg"]
+	path = deps/FFmpeg
+	url = git@github.com:irakr/FFmpeg.git

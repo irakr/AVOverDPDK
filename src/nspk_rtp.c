@@ -5,11 +5,16 @@
 #include <nspk.h>
 #include <tldk_utils/udp.h>
 #include <tldk_utils/parse.h>
+#include <libavcodec/avcodec.h>
+#include <libavcodec/avcodec.h>
+
+#define INBUF_SIZE 4096
 
 static int
 nspk_rtp_generate_rtp(struct nspk_rtp_session_t *rtp_sess)
 {
 	int num_pkts = 0;
+
 	// TODO: Implement this function:
 	// - Read media file at rtp_sess->src through ffmpeg lib.
 	// - Parse the file and generate H264 RTP payload.

@@ -8,14 +8,26 @@ Core library of the NSPK(Net-Speaker) framework. It provides a set of libraries 
 
 ##### There are 2 modes of building NSPKCore, one through a docker container and one in the host itself.
  
-1. Create workspace directory:
+1. Install dependencies:
+   ```
+   $ sudo apt install make meson ninja-build pkg-config build-essentials \
+     libass-dev libfreetype6-dev libgnutls28-dev libmp3lame-dev libtool \
+     libva-dev libvdpau-dev libvorbis-dev libsdl2-dev libxcb1-dev \
+     libxcb-shm0-dev libxcb-xfixes0-dev libnuma-dev \
+     texinfo wget yasm nasm zlib1g-dev
+   $ sudo apt install ffmpeg libavcodec-dev libavdevice-dev libavformat-dev libavutil-dev \
+      libavfilter-dev libswscale-dev libpostproc-dev libfdk-aac-dev
+   ```
+
+2. Create workspace directory:
   Lets assume the project directory is:
   ~/workspace/projects/
    ```
    $ mkdir NSPK
    $ cd NSPK
    ```
-2. Initialize NSPKCore repo:
+
+3. Initialize NSPKCore repo:
    ```
    $ git clone git@github.com:irakr/NSPKCore.git
    $ cd NSPKCore/
@@ -23,7 +35,7 @@ Core library of the NSPK(Net-Speaker) framework. It provides a set of libraries 
    $ git submodule update
    ```
 
-3. Configuration environment variables:
+4. Configuration environment variables:
    ```
    $ export MY_USER=$USER
    ```
@@ -48,19 +60,19 @@ Core library of the NSPK(Net-Speaker) framework. It provides a set of libraries 
    This tells build script to use these IP and username in the ssh command to communicate with the target VM.
    NSPK_TARGET_IP can be **localhost** if the current host itself is the target machine.
 
-4. Now we run the actual build script.
+5. Now we run the actual build script.
    This script will install and run a linux container and start the build inside it.
    ```
    $ sudo -E ./build.sh --build
    ```
    After this you will be in the appropriate repo directory inside an linux container.
 
-5. To clean the build run:
+6. To clean the build run:
    ```
    $ sudo -E ./build.sh --clean
    ```
 
-6. To deploy binaries to VM:
+7. To deploy binaries to VM:
    ```
    $ sudo -E ./build.sh --deploy
    ```

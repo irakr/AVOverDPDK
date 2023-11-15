@@ -26,7 +26,15 @@ static: build/$(APP)-static
 
 CC=gcc
 
-LIBS := libdpdk alsa
+FFMPEG_LIBS = libavdevice   \
+              libavformat   \
+              libavfilter   \
+              libavcodec    \
+              libswresample \
+              libswscale    \
+              libavutil
+
+LIBS := libdpdk alsa $(FFMPEG_LIBS)
 PC_FILE := $(shell $(PKGCONF) --path $(LIBS) 2>/dev/null)
 
 DEFINES = -DNETBE_DEBUG -DNETFE_DEBUG
