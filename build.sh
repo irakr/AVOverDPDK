@@ -140,7 +140,14 @@ function _build()
         docker_exec 0 $NSPK_WORKSPACE git config --global --add safe.directory $NSPK_WORKSPACE/deps/tldk
     fi
 
+    # Create the build directory early since even submodule compilation uses this
+    if [ ! -d $NSPK_WORKSPACE/build ]; then
+        cmd_exec 1 $NSPK_WORKSPACE mkdir $NSPK_WORKSPACE/build
+    fi
+
+    ######################################
     # Build dependency DPDK
+    ######################################
     echo "######### Building DPDK ##########"
     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
         cmd_exec 1 $NSPK_WORKSPACE cp -f $NSPK_WORKSPACE/deps/tmp/dpdk/meson.build $NSPK_WORKSPACE/deps/dpdk/config/x86/meson.build
@@ -151,43 +158,57 @@ function _build()
     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
         cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
     fi
+    cmd_exec 1 $NSPK_WORKSPACE touch $NSPK_WORKSPACE/build/.dpdk
 
+    ######################################
     # Build dependency TLDK
+    ######################################
     echo "######### Building TLDK ##########"
     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk make V=1 all
+    cmd_exec 1 $NSPK_WORKSPACE touch $NSPK_WORKSPACE/build/.tldk
 
+    ######################################
     # Build ffmpeg and libav*
+    ######################################
     echo "######### Building FFMPEG and libav* ##########"
     export PKG_CONFIG_PATH="$NSPK_INSTALL_PREFIX/lib/pkgconfig"
-    cmd_exec 1 $NSPK_WORKSPACE/deps/FFmpeg \
-        ./configure \
-        --prefix="$NSPK_INSTALL_PREFIX" \
-        --enable-shared \
-        --extra-cflags="-I$NSPK_INSTALL_PREFIX/include" \
-        --extra-ldflags="-L$NSPK_INSTALL_PREFIX/lib" \
-        --extra-libs=-lpthread --extra-libs=-lm \
-        --ld="g++" \
-        --bindir="$NSPK_INSTALL_PREFIX/bin" \
-        --enable-gpl \
-        --enable-gnutls \
-        --enable-libaom \
-        --enable-libass \
-        --enable-libfdk-aac \
-        --enable-libfreetype \
-        --enable-libmp3lame \
-        --enable-libopus \
-        --enable-libdav1d \
-        --enable-libvorbis \
-        --enable-libx264 \
-        --enable-libx265 \
-        --enable-nonfree
+
+    # Reconfigure FFmpeg build if not built earlier.
+    if [[ ! -d $NSPK_WORKSPACE/build ]] || [[ ! -f $NSPK_WORKSPACE/build/.ffmpeg ]]; then
+        cmd_exec 1 $NSPK_WORKSPACE/deps/FFmpeg \
+            ./configure \
+            --prefix="$NSPK_INSTALL_PREFIX" \
+            --enable-shared \
+            --extra-cflags="-I$NSPK_INSTALL_PREFIX/include" \
+            --extra-ldflags="-L$NSPK_INSTALL_PREFIX/lib" \
+            --extra-libs=-lpthread --extra-libs=-lm \
+            --ld="g++" \
+            --bindir="$NSPK_INSTALL_PREFIX/bin" \
+            --enable-gpl \
+            --enable-gnutls \
+            --enable-libaom \
+            --enable-libass \
+            --enable-libfdk-aac \
+            --enable-libfreetype \
+            --enable-libmp3lame \
+            --enable-libopus \
+            --enable-libdav1d \
+            --enable-libvorbis \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-nonfree
+    fi
 
     cmd_exec 1 $NSPK_WORKSPACE/deps/FFmpeg make V=1 -j8
     cmd_exec 1 $NSPK_WORKSPACE/deps/FFmpeg make install
+    cmd_exec 1 $NSPK_WORKSPACE touch $NSPK_WORKSPACE/build/.ffmpeg
 
+    ######################################
     # Building NSPKCore
+    ######################################
     echo "######### Building NSPKCore ##########"
     cmd_exec 1 $NSPK_WORKSPACE make V=1 all
+    cmd_exec 1 $NSPK_WORKSPACE touch $NSPK_WORKSPACE/build/.nspk
 }
 
 function _clean()
@@ -250,8 +271,10 @@ function clean()
     # NSPKCore cleanup
     cmd_exec 1 $NSPK_WORKSPACE rm -rf build 2>/dev/null
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
+    cmd_exec 1 $NSPK_WORKSPACE rm -f $NSPK_WORKSPACE/build/.nspk
     
     # FFmpeg cleanup
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf build
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/libavcodec*
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/libavdevice*
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/libavformat*
@@ -268,6 +291,7 @@ function clean()
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/libswresample*
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/libswscale*
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/libpostproc*
+    cmd_exec 1 $NSPK_WORKSPACE rm -f $NSPK_WORKSPACE/build/.ffmpeg
 
     # TLDK cleanup
     cmd_exec 0 $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
@@ -275,6 +299,7 @@ function clean()
     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
+    cmd_exec 1 $NSPK_WORKSPACE rm -f $NSPK_WORKSPACE/build/.tldk
 
     # DPDK cleanup
     if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
@@ -300,6 +325,9 @@ function clean()
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
+    cmd_exec 1 $NSPK_WORKSPACE rm -f $NSPK_WORKSPACE/build/.dpdk
+
+    # Cleanup binaries from remote deploy machine.
     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
@@ -318,88 +346,26 @@ function clean()
         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libavcodec*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libavdevice*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libavformat*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libavfilter*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libavutil*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libswresample*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libswscale*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libpostproc*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libavcodec*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libavdevice*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libavformat*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libavfilter*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libavutil*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libswresample*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libswscale*
+        remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/libpostproc*
     fi
 
-    # if [[ "$NSPK_BUILD_ENV" = "docker" ]] && [[ "$cont_up" = "Up" ]]; then
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf build 2>/dev/null
-    #     if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
-    #         cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk/build ninja uninstall 2>/dev/null
-    #     fi
-    #     cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf build 2>/dev/null
-    #     cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf $RTE_TARGET 2>/dev/null
-    #     cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk rm -rf examples/**/$RTE_TARGET 2>/dev/null
-    #     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-    #         cmd_exec 0 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
-    #     fi
-    #     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk make clean 2>/dev/null
-    #     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf build 2>/dev/null
-    #     cmd_exec 1 $NSPK_WORKSPACE/deps/tldk rm -rf $RTE_TARGET 2>/dev/null
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
-    #     cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_INSTALL_PREFIX/share/dpdk/
-    # else
-    #     run_cmd 1 rm -rf build
-    #     if [ -d $NSPK_WORKSPACE/deps/dpdk/build ]; then
-    #         run_cmd 0 cd $NSPK_WORKSPACE/deps/dpdk/build && ninja uninstall && cd $NSPK_WORKSPACE
-    #     fi
-    #     run_cmd 1 rm -rf deps/dpdk/build
-    #     run_cmd 1 rm -rf deps/dpdk/$RTE_TARGET
-    #     run_cmd 1 rm -rf deps/dpdk/examples/**/$RTE_TARGET
-    #     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-    #         cmd_exec 1 $NSPK_WORKSPACE/deps/dpdk git checkout config/x86/meson.build
-    #     fi
-    #     run_cmd 1 cd deps/tldk && make clean && cd $NSPK_WORKSPACE
-    #     run_cmd 1 rm -rf deps/tldk/build
-    #     run_cmd 1 rm -rf deps/tldk/$RTE_TARGET
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
-    #     run_cmd 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
-    #     if [[ "$NSPK_VM_BUILD" = "1" ]]; then
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/rte_*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/dpdk/
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/include/generic/rte_*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/librte_*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/libtle_*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/librte_*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/dpdk
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/lib/x86_64-linux-gnu/pkgconfig/libdpdk*.pc
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/sbin/dpdk-devbind
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/dpdk-*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testpmd
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testfib
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testsad
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/testbbdev
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/l4fwd*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/bin/nspk*
-    #         remote_exec 1 rm -rf $NSPK_INSTALL_PREFIX/share/dpdk
-    #     fi
-    # fi
+    # Complete the cleanup
+    cmd_exec 1 $NSPK_WORKSPACE rm -rf $NSPK_WORKSPACE/build
 
     _clean
 }
