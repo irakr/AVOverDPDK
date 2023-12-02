@@ -265,8 +265,11 @@ extern struct tx_content tx_content;
 
 #define	DUMMY_MACRO	do {} while (0)
 
+#include <libavutil/log.h>
+
 #ifdef NETFE_DEBUG
-#define	NETFE_TRACE(fmt, arg...)	printf(fmt, ##arg)
+// #define	NETFE_TRACE(fmt, arg...)	printf(fmt, ##arg)
+#define	NETFE_TRACE(fmt, arg...)	av_log(NULL, AV_LOG_DEBUG, fmt, ##arg)
 #define	NETFE_PKT_DUMP(p)		rte_pktmbuf_dump(stdout, (p), 64)
 #else
 #define	NETFE_TRACE(fmt, arg...)	DUMMY_MACRO
@@ -274,7 +277,8 @@ extern struct tx_content tx_content;
 #endif
 
 #ifdef NETBE_DEBUG
-#define	NETBE_TRACE(fmt, arg...)	printf(fmt, ##arg)
+// #define	NETBE_TRACE(fmt, arg...)	printf(fmt, ##arg)
+#define	NETBE_TRACE(fmt, arg...)	av_log(NULL, AV_LOG_DEBUG, fmt, ##arg)
 #define	NETBE_PKT_DUMP(p)		rte_pktmbuf_dump(stdout, (p), 64)
 #else
 #define	NETBE_TRACE(fmt, arg...)	DUMMY_MACRO

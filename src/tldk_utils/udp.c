@@ -15,7 +15,9 @@ netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
 	uint16_t errport;
 	struct tle_udp_stream_param uprm;
 
+	av_log(NULL, AV_LOG_DEBUG, "%s: called\n", __func__);
 	fes = netfe_get_stream(&fe->free);
+	av_log(NULL, AV_LOG_DEBUG, "%s: fes=%p\n", __func__, fes);
 	if (fes == NULL) {
 		rte_errno = ENOBUFS;
 		return NULL;
@@ -62,8 +64,8 @@ netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
 		}
 
 		RTE_LOG(ERR, USER1, "stream open failed for port %u with error "
-			"code=%u, bidx=%u, lc=%u\n",
-			errport, rc, bidx, becfg.cpu[bidx].id);
+			"code=%u(%s), bidx=%u, lc=%u\n",
+			errport, rc, rte_strerror(rc), bidx, becfg.cpu[bidx].id);
 		return NULL;
 	}
 
@@ -179,19 +181,19 @@ netfe_stream_open_udp(struct netfe_lcore *fe, struct netfe_sprm *sprm,
 // 	return rc;
 // }
 
-struct netfe_stream*
-netfe_lcore_init_udp(const struct netfe_lcore_prm *prm)
+int netfe_init_per_lcore_fe(const struct netfe_lcore_prm *prm)
 {
 	size_t sz;
 	int32_t rc;
 	uint32_t i, lcore, snum;
-	struct netfe_lcore *fe; // array of netfe_lcore
+	struct netfe_lcore *fe;
 	struct tle_evq_param eprm;
 	struct netfe_stream *fes = NULL;
 	struct netfe_sprm *sprm;
 
 	lcore = rte_lcore_id();
 
+	// TODO: Lets use 0x100(256) for now. 
 	snum = prm->max_streams; // No of events == No of streams
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u, nb_streams=%u, max_streams=%u)\n",
 		__func__, lcore, prm->nb_streams, snum);
@@ -203,50 +205,82 @@ netfe_lcore_init_udp(const struct netfe_lcore_prm *prm)
 	// This will allocate memory blocks as such:
 	// 1st block -> netfe_lcore[1]
 	// Next n blocks -> netfe_stream[snum]
-	sz = sizeof(*fe) + snum * sizeof(struct netfe_stream);
-	fe = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
-		rte_lcore_to_socket_id(lcore));
+	fe = RTE_PER_LCORE(_fe);
+	if (!fe) {
+		RTE_LOG(NOTICE, USER1, "%s: Initializing per lcore FE for lcore %u\n",
+				__func__, lcore);
+		sz = sizeof(*fe) + snum * sizeof(struct netfe_stream);
+		fe = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
+			rte_lcore_to_socket_id(lcore));
 
-	if (fe == NULL) {
-		RTE_LOG(ERR, USER1, "%s:%d failed to allocate %zu bytes\n",
-			__func__, __LINE__, sz);
+		if (fe == NULL) {
+			RTE_LOG(ERR, USER1, "%s:%d failed to allocate %zu bytes\n",
+				__func__, __LINE__, sz);
+			return ENOMEM;
+		}
+
+		fe->snum = snum;
+
+		/* initialize the stream pool */
+		LIST_INIT(&fe->free.head);
+		LIST_INIT(&fe->use.head);
+
+		/* allocate the event queues */
+		fe->rxeq = tle_evq_create(&eprm);
+		fe->txeq = tle_evq_create(&eprm);
+
+		RTE_LOG(INFO, USER1, "%s(%u) rx evq=%p, tx evq=%p\n",
+			__func__, lcore, fe->rxeq, fe->txeq);
+		if (fe->rxeq == NULL || fe->txeq == NULL)
+			return ENOMEM;
+	
+		rc = fwd_tbl_init(fe, AF_INET, lcore);
+		RTE_LOG(ERR, USER1, "%s(%u) fwd_tbl_init(%u) returns %d\n",
+			__func__, lcore, AF_INET, rc);
+		if (rc != 0)
+			return ENOMEM;
+	
+		rc = fwd_tbl_init(fe, AF_INET6, lcore);
+		RTE_LOG(ERR, USER1, "%s(%u) fwd_tbl_init(%u) returns %d\n",
+			__func__, lcore, AF_INET6, rc);
+		if (rc != 0)
+			return ENOMEM;
+
+		// Initially assigning all available streams to free list.
+		fes = (struct netfe_stream *)(fe + 1); // FYI: All FEs stay at +1 onwards.
+		for (i = 0; i < snum; ++i)
+			netfe_put_stream(fe, &fe->free, fes + i);
+
+		// Finally save the address to per lcore fe.
+		RTE_PER_LCORE(_fe) = fe;
+	}
+
+	return 0;
+}
+
+struct netfe_stream*
+netfe_lcore_init_udp(const struct netfe_lcore_prm *prm)
+{
+	size_t sz;
+	int32_t rc;
+	uint32_t i, lcore, snum;
+	struct netfe_lcore *fe;
+	struct tle_evq_param eprm;
+	struct netfe_stream *fes = NULL;
+	struct netfe_sprm *sprm;
+
+	lcore = rte_lcore_id();
+
+	fe = RTE_PER_LCORE(_fe);
+	if (!fe) {
 		return NULL;
 	}
 
-	RTE_PER_LCORE(_fe) = fe;
-
-	fe->snum = snum;
-	/* initialize the stream pool */
-	LIST_INIT(&fe->free.head);
-	LIST_INIT(&fe->use.head);
-	fes = (struct netfe_stream *)(fe + 1);
-	printf("%s: netfe_put_stream 1", __func__);
-	netfe_put_stream(fe, &fe->free, fes);
-
-	/* allocate the event queues */
-	fe->rxeq = tle_evq_create(&eprm);
-	fe->txeq = tle_evq_create(&eprm);
-
-	RTE_LOG(INFO, USER1, "%s(%u) rx evq=%p, tx evq=%p\n",
-		__func__, lcore, fe->rxeq, fe->txeq);
-	if (fe->rxeq == NULL || fe->txeq == NULL)
-		return NULL;
-
-	rc = fwd_tbl_init(fe, AF_INET, lcore);
-	RTE_LOG(ERR, USER1, "%s(%u) fwd_tbl_init(%u) returns %d\n",
-		__func__, lcore, AF_INET, rc);
-	if (rc != 0)
-		return NULL;
-
-	rc = fwd_tbl_init(fe, AF_INET6, lcore);
-	RTE_LOG(ERR, USER1, "%s(%u) fwd_tbl_init(%u) returns %d\n",
-		__func__, lcore, AF_INET6, rc);
-	if (rc != 0)
-		return NULL;
-
-	i = 0;
+	i = fe->use.num;
+	RTE_LOG(INFO, USER1, "%s: Streams free=%u, used=%u(BEFORE)\n",
+			__func__, fe->free.num, fe->use.num);
 	/* open all requested streams. */
-	sprm = &prm->stream[i].sprm;
+	sprm = &prm->stream[i].sprm; // FYI: prm->stream[i] holds params for fe->use[i]
 	fes = netfe_stream_open_udp(fe, sprm, lcore, prm->stream[i].op,
 		sprm->bidx);
 	if (fes == NULL) {
@@ -269,7 +303,10 @@ netfe_lcore_init_udp(const struct netfe_lcore_prm *prm)
 		fes->txlen = prm->stream[i].txlen;
 		fes->raddr = prm->stream[i].sprm.remote_addr;
 	}
-
+	netfe_put_stream(fe, &fe->use, fes + i);
+	i = fe->use.num;
+	RTE_LOG(INFO, USER1, "%s: Streams free=%u, used=%u(AFTER)\n",
+			__func__, fe->free.num, fe->use.num);
 	return fes;
 }
 
@@ -548,6 +585,8 @@ netfe_tx_process_udp(uint32_t lcore, struct netfe_stream *fes)
 	if (n == 0)
 		return;
 
+	NETFE_TRACE("%s: pbuf.num=%u\n",
+			__func__, n);
 	/**
 	 * TODO: cannot use function pointers for unequal param num.
 	 */

@@ -1,4 +1,4 @@
-#include <nspk_control.h>
+#include <nspk_control_lcore.h>
 #include <tldk_utils/udp.h>
 
 int

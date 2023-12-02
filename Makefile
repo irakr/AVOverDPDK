@@ -1,8 +1,10 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# Copyright(c) 2010-2014 Intel Corporation
+# Copyright(c) 2023 Irak Rigia
 
 # Project root
 PROJECT_ROOT=$(PWD)
+DEP_FFMPEG=$(PROJECT_ROOT)/deps/FFmpeg
+DEP_TLDK=$(PROJECT_ROOT)/deps/tldk
+DEP_DPDK=$(PROJECT_ROOT)/deps/dpdk
 
 # binary name
 APP = nspk-core
@@ -34,14 +36,16 @@ FFMPEG_LIBS = libavdevice   \
               libswscale    \
               libavutil
 
-LIBS := libdpdk alsa $(FFMPEG_LIBS)
+LIBS := $(FFMPEG_LIBS) libdpdk alsa
 PC_FILE := $(shell $(PKGCONF) --path $(LIBS) 2>/dev/null)
 
 DEFINES = -DNETBE_DEBUG -DNETFE_DEBUG
-INCLUDE_DIRS = -I$(PROJECT_ROOT)/include/ -I$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/include
+INCLUDE_DIRS = -I$(PROJECT_ROOT)/include/ -I$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/include \
+	-I$(DEP_FFMPEG)
+
 CFLAGS += $(DEFINES) $(INCLUDE_DIRS) -D_GNU_SOURCE -DALLOW_EXPERIMENTAL_API
 CFLAGS += $(shell $(PKGCONF) --cflags $(LIBS))
-CFLAGS += -g -O0
+CFLAGS += -fPIC -g -O0
 
 LDFLAGS_SHARED = -L$(PROJECT_ROOT)/deps/tldk/${RTE_TARGET}/lib -ltle_dring -ltle_timer -ltle_memtank -ltle_l4p
 LDFLAGS_SHARED += $(shell $(PKGCONF) --libs $(LIBS))
@@ -69,4 +73,4 @@ build:
 .PHONY: clean
 clean:
 	rm -f build/$(APP) build/$(APP)-static build/$(APP)-shared
-	test -d build && rmdir -p build || true
+	test -d build && rm -rf build || true

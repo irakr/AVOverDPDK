@@ -207,6 +207,35 @@ pkt_buf_fill(uint32_t lcore, struct pkt_buf *pb, uint32_t dlen)
 	pb->num = i;
 }
 
+
+int
+pkt_buf_fill_data(uint32_t lcore, struct pkt_buf *pb, void *data, int dlen)
+{
+	// @dlen -> fe.cfg -> "txlen=xx"
+	uint32_t i;
+	int32_t sid;
+	static bool mbuf_init = false;
+	char *app_data = NULL;
+
+	if (!data || !dlen)
+		return EINVAL;
+
+	sid = rte_lcore_to_socket_id(lcore) + 1;
+	i = pb->num;
+	pb->pkt[i] = rte_pktmbuf_alloc(mpool[sid]);
+	if (pb->pkt[i] == NULL)
+		return ENOMEM;
+	// Appends dlen uninitialized bytes to the data section of the pkt[i] mbuf.
+	rte_pktmbuf_append(pb->pkt[i], dlen);
+	app_data = rte_pktmbuf_mtod(pb->pkt[i], char*);
+
+	// snprintf(app_data, dlen, "Hello from DPDK UDP.\r\n");
+	memcpy(app_data, data, dlen);
+
+	pb->num++;
+	return dlen;
+}
+
 int
 netbe_lcore_setup(struct netbe_lcore *lc)
 {
@@ -575,8 +604,8 @@ netbe_tx(struct netbe_lcore *lc, uint32_t pidx)
 		__func__, lc->id, proto_name[lc->proto],
 		lc->prtq[pidx].dev, j, n);
 
-	for (j = 0; j != n; j++)
-		NETBE_PKT_DUMP(mb[j]);
+	// for (j = 0; j != n; j++)
+	// 	NETBE_PKT_DUMP(mb[j]);
 
 	// This is where we finally send out the packet to the NIC.
 	k = rte_eth_tx_burst(lc->prtq[pidx].port.id,
@@ -604,6 +633,8 @@ netbe_lcore(void)
 	if (lc == NULL)
 		return;
 
+	NETBE_TRACE("%s: lc->prtq_num=%u\n",
+		__func__, lc->prtq_num);
 	for (i = 0; i != lc->prtq_num; i++) {
 		netbe_rx(lc, i); // TODO: Need to understand why receive? Except ARP.
 		netbe_tx(lc, i);
@@ -729,6 +760,7 @@ netfe_rx_process(uint32_t lcore, struct netfe_stream *fes)
 	fes->stat.rxp += n;
 
 	/* free all received mbufs. */
+	fes->op = RXONLY;
 	if (fes->op == RXONLY)
 		fes->stat.rxb += pkt_buf_empty(&fes->pbuf);
 	else if (fes->op == RXTX) {

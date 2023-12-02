@@ -57,6 +57,9 @@ void
 pkt_buf_fill(uint32_t lcore, struct pkt_buf *pb, uint32_t dlen);
 
 int
+pkt_buf_fill_data(uint32_t lcore, struct pkt_buf *pb, void *data, int dlen);
+
+int
 netbe_lcore_setup(struct netbe_lcore *lc);
 
 void

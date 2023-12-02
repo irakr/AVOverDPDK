@@ -18,6 +18,8 @@
 
 #include <nspk.h>
 
+int netfe_init_per_lcore_fe(const struct netfe_lcore_prm *prm);
+
 /*
  * helper function: opens IPv4 and IPv6 streams for selected port.
  */

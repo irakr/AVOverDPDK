@@ -22,8 +22,8 @@
 
 volatile int force_quit;
 
-RTE_DEFINE_PER_LCORE(struct netbe_lcore *, _be);
-RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe);
+RTE_DEFINE_PER_LCORE(struct netbe_lcore *, _be) = NULL;
+RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe) = NULL;
 
 struct netbe_cfg becfg = {.mpool_buf_num=MPOOL_NB_BUF};
 struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
@@ -231,14 +231,20 @@ main(int argc, char *argv[])
 	/* launch all slave lcores. */
 	RTE_LCORE_FOREACH_WORKER(i) {
 		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0) {
-			struct nspk_rtp_session_t *my_sess = calloc(1, sizeof(*my_sess));
+			struct nspk_rtp_session_ctx_t *my_sess = calloc(1, sizeof(*my_sess));
 			my_sess->session_id = 0;
-			strncpy(my_sess->src.src_name, "/home/procfser/Videos/WeddingMovie.mp4", sizeof(my_sess->src.src_name));
+			strncpy(my_sess->src_url, "/home/procfser/Videos/sample_1280x720_surfing_with_audio.mpeg",
+					sizeof(my_sess->src_url));
+			strncpy(my_sess->dst_url, "rtp://192.168.1.9:5000", sizeof(my_sess->dst_url));
 			my_sess->lcore_prm = prm + i;
 			rc1 = rte_eal_remote_launch(nspk_lcore_main_rtp, my_sess, i);
+			if (rc1 == 0) {
+				printf("RTP thread started at slave LCore %u\n", i);
+				break;
+			}
+			printf("Failed to launch RTP thread at core %u. Trying next...", i);
 		}
 	}
-	printf("Slave lcore initialized, rc1=%d.\n", rc1);
 
 	/* launch master lcore. */
 	i = rte_get_main_lcore();

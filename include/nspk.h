@@ -6,11 +6,13 @@
 #include <rte_arp.h>
 #include <rte_log.h>
 #include <rte_per_lcore.h>
-#include <nspk_audio.h>
-#include <nspk_control.h>
 #include <tldk_utils/netbe.h>
 #include <tldk_utils/common.h>
-#include <nspk_rtp.h>
+#include <nspk_audio.h>
+#include <nspk_control_lcore.h>
+#include <nspk_rtp_lcore.h>
+#include <nspk_avio.h>
+#include <nspk_tldk.h>
 
 #define	MAX_RULES	0x100
 #define	MAX_TBL8	0x800
@@ -51,6 +53,8 @@ extern TLE_STREAM_RECV_FUNCTYPE tle_stream_recv;
 extern TLE_STREAM_CLOSE_FUNCTYPE tle_stream_close;
 
 extern LCORE_MAIN_FUNCTYPE lcore_main;
+
+extern struct nspk_rtp_session_ctx_t *g_rtp_sess;
 
 /**
  * Location to be modified to create the IPv4 hash key which helps
