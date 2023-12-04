@@ -11,7 +11,6 @@ static int nspk_url_alloc_for_protocol(URLContext **puc, const URLProtocol *up,
 {
     URLContext *uc;
     int err;
-    av_log(NULL, AV_LOG_DEBUG, "+IRAK: %s: URLProtocol=%s\n", __FUNCTION__, up->name);
 #if CONFIG_NETWORK
     if (up->flags & URL_PROTOCOL_FLAG_NETWORK && !ff_network_init())
         return AVERROR(EIO);
@@ -82,7 +81,6 @@ static int nspk_url_alloc_for_protocol(URLContext **puc, const URLProtocol *up,
     }
     if (int_cb)
         uc->interrupt_callback = *int_cb;
-    av_log(NULL, AV_LOG_DEBUG, "+IRAK: %s: returning\n", __FUNCTION__);
     *puc = uc;
     return 0;
 fail:
@@ -104,7 +102,7 @@ int nspk_ffurl_open_whitelist(URLContext **puc, const char *filename, int flags,
 {
     AVDictionary *tmp_opts = NULL;
     AVDictionaryEntry *e;
-
+    parent->priv_data;
     int ret = nspk_url_alloc_for_protocol(puc, tldk_protocol,
                                       filename, AVIO_FLAG_WRITE,
                                       NULL);
@@ -142,9 +140,7 @@ int nspk_ffurl_open_whitelist(URLContext **puc, const char *filename, int flags,
 
     if ((ret = av_opt_set_dict(*puc, options)) < 0)
         goto fail;
-    av_log(NULL, AV_LOG_DEBUG, "+IRAK: %s: calling ffurl_connect()\n", __FUNCTION__);
     ret = ffurl_connect(*puc, NULL);
-    av_log(NULL, AV_LOG_DEBUG, "+IRAK: %s: ffurl_connect() returned\n", __FUNCTION__);
     if (!ret)
         return 0;
 fail:

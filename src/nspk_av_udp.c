@@ -524,7 +524,6 @@ end:
 /* return non zero if error */
 static int udp_open(URLContext *h, const char *uri, int flags)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
     char hostname[1024], localaddr[1024] = "";
     int port, udp_fd = -1, tmp, bind_ret = -1, dscp = -1;
     UDPTldkContext *s = h->priv_data;
@@ -535,7 +534,7 @@ static int udp_open(URLContext *h, const char *uri, int flags)
     socklen_t len;
     int ret;
 
-    av_log(NULL, AV_LOG_DEBUG, "+IRAK: %s: URI=%s\n", __FUNCTION__, uri);
+    av_log(NULL, AV_LOG_DEBUG, "%s: URL=%s\n", __FUNCTION__, uri);
     h->is_streamed = 1;
 
     is_output = !(flags & AVIO_FLAG_READ);
@@ -756,7 +755,6 @@ static int udp_open(URLContext *h, const char *uri, int flags)
 
 static int udp_read(URLContext *h, uint8_t *buf, int size)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
     return 0;
     UDPTldkContext *s = h->priv_data;
     int ret;
@@ -875,7 +873,6 @@ static int udp_write(URLContext *h, const uint8_t *buf, int size)
     // }
 
     if (!s->is_connected) {
-        av_log(NULL, AV_LOG_DEBUG, "+IRAK: Sending packet to TLDK\n");
         // ret = sendto (s->udp_fd, buf, size, 0,
         //               (struct sockaddr *) &s->dest_addr,
         //               s->dest_addr_len);
@@ -893,7 +890,6 @@ static int udp_write(URLContext *h, const uint8_t *buf, int size)
 
 static int udp_close(URLContext *h)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
 
     UDPTldkContext *s = h->priv_data;
 

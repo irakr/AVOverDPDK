@@ -150,7 +150,7 @@ static int open_output_file(struct nspk_rtp_session_ctx_t *rtp_sess, int target_
     }
 
     // TODO: Use NSPK's RTP codec.
-    av_log(NULL, AV_LOG_DEBUG, "====IRAK==== Guessing codec for %s\n", filename);
+    av_log(NULL, AV_LOG_DEBUG, "Guessing codec for %s\n", filename);
     enum AVCodecID out_codec = av_guess_codec(ofmt_ctx->oformat, NULL, filename, NULL, AVMEDIA_TYPE_VIDEO);
     if (out_codec == AV_CODEC_ID_NONE) {
         av_log(NULL, AV_LOG_ERROR, "Could not guess codec\n");
@@ -182,7 +182,7 @@ static int open_output_file(struct nspk_rtp_session_ctx_t *rtp_sess, int target_
          * sample rate etc.). These properties can be changed for output
          * streams easily using filters */
         if (dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
-            av_log(NULL, AV_LOG_DEBUG, "====IRAK==== AVMEDIA_TYPE_VIDEO\n");
+            av_log(NULL, AV_LOG_DEBUG, "AVMEDIA_TYPE_VIDEO\n");
             enc_ctx->height = dec_ctx->height;
             enc_ctx->width = dec_ctx->width;
             enc_ctx->sample_aspect_ratio = dec_ctx->sample_aspect_ratio;
@@ -192,12 +192,12 @@ static int open_output_file(struct nspk_rtp_session_ctx_t *rtp_sess, int target_
             else
                 enc_ctx->pix_fmt = dec_ctx->pix_fmt;
             /* video time_base can be set to whatever is handy and supported by encoder */
-            // av_log(NULL, AV_LOG_DEBUG, "====IRAK==== framerate=%d/%d\n", enc_ctx->framerate.num, enc_ctx->framerate.den);
+            // av_log(NULL, AV_LOG_DEBUG, "framerate=%d/%d\n", enc_ctx->framerate.num, enc_ctx->framerate.den);
             // enc_ctx->time_base = (AVRational){1, 25};
             enc_ctx->time_base = av_inv_q(dec_ctx->framerate);
-            av_log(NULL, AV_LOG_DEBUG, "====IRAK==== time_base=%d/%d\n", enc_ctx->time_base.num, enc_ctx->time_base.den);
+            av_log(NULL, AV_LOG_DEBUG, "time_base=%d/%d\n", enc_ctx->time_base.num, enc_ctx->time_base.den);
         } else {
-            av_log(NULL, AV_LOG_DEBUG, "====IRAK==== AVMEDIA_TYPE_AUDIO\n");
+            av_log(NULL, AV_LOG_DEBUG, "AVMEDIA_TYPE_AUDIO\n");
             enc_ctx->sample_rate = dec_ctx->sample_rate;
             enc_ctx->channel_layout = dec_ctx->channel_layout;
             enc_ctx->channels = av_get_channel_layout_nb_channels(enc_ctx->channel_layout);
@@ -213,13 +213,11 @@ static int open_output_file(struct nspk_rtp_session_ctx_t *rtp_sess, int target_
             av_log(NULL, AV_LOG_ERROR, "Cannot open video encoder for stream #%u\n", i);
             return ret;
         }
-        av_log(NULL, AV_LOG_DEBUG, "====IRAK====: avcodec_open2() done\n");
         ret = avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);
         if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR, "Failed to copy encoder parameters to output stream #%u\n", i);
             return ret;
         }
-        av_log(NULL, AV_LOG_DEBUG, "====IRAK====: avcodec_parameters_from_context() done\n");
         out_stream->time_base = enc_ctx->time_base;
         stream_ctx[i].enc_ctx = enc_ctx;
     } else if (dec_ctx->codec_type == AVMEDIA_TYPE_UNKNOWN) {
@@ -241,10 +239,9 @@ static int open_output_file(struct nspk_rtp_session_ctx_t *rtp_sess, int target_
         // ret = avio_open(&ofmt_ctx->pb, filename, AVIO_FLAG_WRITE);
         ret = nspk_avio_open(rtp_sess, &ofmt_ctx->pb, filename, AVIO_FLAG_WRITE);
         if (ret < 0) {
-            av_log(NULL, AV_LOG_ERROR, "nspk_avio_open(): Could not open output file '%s'", filename);
+            av_log(NULL, AV_LOG_ERROR, "nspk_avio_open: Could not open output file '%s'", filename);
             return ret;
         }
-        av_log(NULL, AV_LOG_INFO, "%s: nspk_avio_open done\n", __func__);
     }
 
     /* init muxer, write output file header */

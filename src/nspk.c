@@ -233,7 +233,7 @@ main(int argc, char *argv[])
 		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0) {
 			struct nspk_rtp_session_ctx_t *my_sess = calloc(1, sizeof(*my_sess));
 			my_sess->session_id = 0;
-			strncpy(my_sess->src_url, "/home/procfser/Videos/sample_1280x720_surfing_with_audio.mpeg",
+			strncpy(my_sess->src_url, "/home/procfser/Videos/Movie43.mp4",
 					sizeof(my_sess->src_url));
 			strncpy(my_sess->dst_url, "rtp://192.168.1.9:5000", sizeof(my_sess->dst_url));
 			my_sess->lcore_prm = prm + i;

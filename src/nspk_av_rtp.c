@@ -209,7 +209,6 @@ static void build_udp_url(RTPContext *s,
 
 static int rtp_open(URLContext *h, const char *uri, int flags)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
 
     RTPContext *s = h->priv_data;
     AVDictionary *fec_opts = NULL;
@@ -307,14 +306,12 @@ static int rtp_open(URLContext *h, const char *uri, int flags)
         build_udp_url(s, buf, sizeof(buf),
                       hostname, rtp_port, s->local_rtpport,
                       sources, block);
-        av_log(NULL, AV_LOG_DEBUG, "+IRAK [%d]: %s: udp_url=%s\n", i, __FUNCTION__, buf);
         // TODO: Refactor
         // For RTP stream using TLDK UDP
         if (nspk_ffurl_open_whitelist(&s->rtp_hd, buf, flags, &h->interrupt_callback,
                                  NULL, h->protocol_whitelist, h->protocol_blacklist, h, &tldk_udp_protocol) < 0)
             goto fail;
         s->local_rtpport = ff_udp_get_local_port(s->rtp_hd);
-        av_log(NULL, AV_LOG_DEBUG, "+IRAK: %s: local_rtpport=%u\n", __FUNCTION__, s->local_rtpport);
         if(s->local_rtpport == 65535) {
             s->local_rtpport = -1;
             continue;
@@ -380,7 +377,6 @@ static int rtp_open(URLContext *h, const char *uri, int flags)
 // TODO: Do TLDK UDP
 static int rtp_read(URLContext *h, uint8_t *buf, int size)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
 
     RTPContext *s = h->priv_data;
     int len, n, i;
@@ -426,7 +422,6 @@ static int rtp_read(URLContext *h, uint8_t *buf, int size)
 
 static int rtp_write(URLContext *h, const uint8_t *buf, int size)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
 
     RTPContext *s = h->priv_data;
     int ret, ret_fec;
@@ -487,7 +482,6 @@ static int rtp_write(URLContext *h, const uint8_t *buf, int size)
         ret = sendto(fd, buf, size, 0, (struct sockaddr *) source,
                      *source_len);
         char ip_addr[INET_ADDRSTRLEN + 1];
-        av_log(NULL, AV_LOG_DEBUG, "===IRAK====: %s: sendto(%p, %u, %s)\n", __FUNCTION__, buf, size, inet_ntop(AF_INET, (struct sockaddr_in*)source, ip_addr, *source_len));
         return ret < 0 ? ff_neterrno() : ret;
     }
 
@@ -517,7 +511,6 @@ static int rtp_write(URLContext *h, const uint8_t *buf, int size)
 
 static int rtp_close(URLContext *h)
 {
-    av_log(NULL, AV_LOG_DEBUG, "**IRAK**: %s\n", __FUNCTION__);
 
     RTPContext *s = h->priv_data;
 
