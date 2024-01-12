@@ -1,6 +1,6 @@
 ## NSPKCore
 
-Core library of the NSPK(Net-Speaker) framework. It provides a set of libraries to enable real time AV IP protocols such as RTP, RTCP, RTSP and SRTP. It uses DPDK and TLDK to transmit AV packets over to the network so that the network performance and quality is at its best.
+Enabling RTP, RTSP and other network streaming through kernel bypass using DPDK, TLDK and FFmpeg.
 
 ##### NOTE: NSPKCore is only supported by x86_64.
 
