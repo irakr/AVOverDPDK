@@ -1,6 +1,10 @@
 #!/usr/bin/bash
 
 ###########################################################
+# Copyright(c) 2023 Irak Rigia
+###########################################################
+
+###########################################################
 # This script loads this workspace into a linux container
 # and performs the build there.
 #

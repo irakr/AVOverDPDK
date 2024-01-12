@@ -7,3 +7,5 @@ int nspk_tldk_udp_stream_send(UDPTldkContext *udp_ctx, void *data, int dlen);
 int nspk_tldk_udp_stream_recv(UDPTldkContext *udp_ctx, void *data, int *dlen);
 
 int nspk_tldk_udp_stream_delete(UDPTldkContext *udp_ctx);
+
+void print_stream_addresses(struct netfe_sprm *sprm);

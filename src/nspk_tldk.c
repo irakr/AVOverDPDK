@@ -1,7 +1,7 @@
 #include <nspk.h>
 #include <tldk_utils/udp.h>
 
-static void print_stream_addresses(struct netfe_sprm *sprm)
+void print_stream_addresses(struct netfe_sprm *sprm)
 {
     struct sockaddr_in *laddr = (struct sockaddr_in*)&sprm->local_addr;
     struct sockaddr_in *raddr = (struct sockaddr_in*)&sprm->remote_addr;
@@ -68,9 +68,6 @@ int nspk_tldk_udp_stream_send(UDPTldkContext *udp_ctx, void *data, int dlen)
     static const uint32_t FLUSH_THRESHOLD = 128;
     int ret = 0;
 
-    av_log(NULL, AV_LOG_DEBUG, "%s: \n", __func__);
-    print_stream_addresses(udp_ctx->tldk_stream_prm);
-
     ret = pkt_buf_fill_data(rte_lcore_id(), &udp_ctx->tldk_udp_stream->pbuf, data, dlen);
     if (ret < 0) {
         av_log(NULL, AV_LOG_DEBUG, "%s: pkt_buf_fill_data failed, ret=%d\n", __func__, ret);
@@ -78,10 +75,8 @@ int nspk_tldk_udp_stream_send(UDPTldkContext *udp_ctx, void *data, int dlen)
     }
 
     // Flush
-    av_log(NULL, AV_LOG_DEBUG, "%s: pkt.num=%u\n", __func__, udp_ctx->tldk_udp_stream->pbuf.num);
     if (udp_ctx->tldk_udp_stream->pbuf.num >= FLUSH_THRESHOLD) {
         // TODO: Implement return values for these function.
-        av_log(NULL, AV_LOG_DEBUG, "%s: Flushing pkts\n", __func__);
         netfe_tx_process_udp(rte_lcore_id(), udp_ctx->tldk_udp_stream);
 	    netbe_lcore();
     }

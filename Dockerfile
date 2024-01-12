@@ -1,5 +1,8 @@
+###########################################################
+# Copyright(c) 2023 Irak Rigia
+###########################################################
 FROM ubuntu
-LABEL maintainer="irakrigia92@gmail.com"
+LABEL maintainer="tarakrigia@gmail.com"
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt -y update && apt -y install iproute2 iputils-ping tcpdump net-tools binutils gdb nmap vim git nano make
 RUN apt -y install gcc-9 g++-9 file meson python3-pyelftools libnuma-dev pkgconf bash-completion linux-headers-generic \

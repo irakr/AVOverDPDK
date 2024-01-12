@@ -665,6 +665,7 @@ static int udp_open(URLContext *h, const char *uri, int flags)
     }
 
     s->local_port = 0; // TODO: Try to get it from TLDK APIs
+    print_stream_addresses(s->tldk_stream_prm);
 
     av_log(h, AV_LOG_DEBUG, "%s: TLDK UDP stream opened.\n", __func__);
 
@@ -837,8 +838,6 @@ static int udp_write(URLContext *h, const uint8_t *buf, int size)
     UDPTldkContext *s = h->priv_data;
     int ret;
 
-    av_log(NULL, AV_LOG_DEBUG, "%s: filename=%s\n", __FUNCTION__, h->filename);
-
 #if HAVE_PTHREAD_CANCEL
     if (s->fifo) {
         uint8_t tmp[4];
@@ -883,7 +882,6 @@ static int udp_write(URLContext *h, const uint8_t *buf, int size)
         ;
         // ret = send(s->udp_fd, buf, size, 0);
     }
-    av_log(NULL, AV_LOG_DEBUG, "%s: ret=%d\n", __func__, ret);
 
     return ret < 0 ? ff_neterrno() : ret;
 }

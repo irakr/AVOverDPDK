@@ -1,24 +1,12 @@
-/*
- * Copyright (c) 2016-2017  Intel Corporation.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #include <nspk.h>
 #include <tldk_utils/parse.h>
 #include <tldk_utils/port.h>
 #include <tldk_utils/lcore.h>
 #include <tldk_utils/tcp.h>
 #include <tldk_utils/udp.h>
+
+#define RTP_VIDEO_SRC_PATH "/home/user1/Videos/Video1.mp4"
+#define RTP_VIDEO_SRC_URL  "rtp://192.168.1.100:5000"
 
 volatile int force_quit;
 
@@ -226,16 +214,16 @@ main(int argc, char *argv[])
 	rc = (rc != 0) ? rc : netfe_lcore_fill(prm, &feprm);
 	if (rc != 0)
 		sig_handle(SIGQUIT);
-	
+
 	int rc1;
 	/* launch all slave lcores. */
 	RTE_LCORE_FOREACH_WORKER(i) {
 		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0) {
 			struct nspk_rtp_session_ctx_t *my_sess = calloc(1, sizeof(*my_sess));
 			my_sess->session_id = 0;
-			strncpy(my_sess->src_url, "/home/procfser/Videos/Movie43.mp4",
+			strncpy(my_sess->src_url, RTP_VIDEO_SRC_PATH,
 					sizeof(my_sess->src_url));
-			strncpy(my_sess->dst_url, "rtp://192.168.1.9:5000", sizeof(my_sess->dst_url));
+			strncpy(my_sess->dst_url, RTP_VIDEO_SRC_URL, sizeof(my_sess->dst_url));
 			my_sess->lcore_prm = prm + i;
 			rc1 = rte_eal_remote_launch(nspk_lcore_main_rtp, my_sess, i);
 			if (rc1 == 0) {

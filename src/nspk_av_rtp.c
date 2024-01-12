@@ -487,11 +487,9 @@ static int rtp_write(URLContext *h, const uint8_t *buf, int size)
 
     if (RTP_PT_IS_RTCP(buf[1])) {
         /* RTCP payload type */
-        av_log(NULL, AV_LOG_DEBUG, "%s: RTCP payload\n", __FUNCTION__);
         hd = s->rtcp_hd;
     } else {
         /* RTP payload type */
-        av_log(NULL, AV_LOG_DEBUG, "%s: RTP payload\n", __FUNCTION__);
         hd = s->rtp_hd;
     }
 

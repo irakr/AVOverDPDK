@@ -57,3 +57,7 @@ dkms.conf
 
 # Log files
 *.log
+
+# IDE files
+.vscode
+

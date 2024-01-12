@@ -446,7 +446,6 @@ static int encode_write_frame(unsigned int stream_index, int flush)
     AVPacket *enc_pkt = filter->enc_pkt;
     int ret;
 
-    av_log(NULL, AV_LOG_INFO, "Encoding frame\n");
     /* encode filtered frame */
     av_packet_unref(enc_pkt);
 
@@ -467,7 +466,6 @@ static int encode_write_frame(unsigned int stream_index, int flush)
                              stream->enc_ctx->time_base,
                              ofmt_ctx->streams[stream_index]->time_base);
 
-        av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
         /* mux encoded frame */
         // ret = av_interleaved_write_frame(ofmt_ctx, enc_pkt);
         
@@ -484,7 +482,6 @@ static int filter_encode_write_frame(AVFrame *frame, unsigned int stream_index)
     struct filtering_ctx_t *filter = &filter_ctx[stream_index];
     int ret;
 
-    av_log(NULL, AV_LOG_INFO, "Pushing decoded frame to filters\n");
     /* push the decoded frame into the filtergraph */
     ret = av_buffersrc_add_frame_flags(filter->buffersrc_ctx,
             frame, 0);
@@ -495,7 +492,6 @@ static int filter_encode_write_frame(AVFrame *frame, unsigned int stream_index)
 
     /* pull filtered frames from the filtergraph */
     while (1) {
-        av_log(NULL, AV_LOG_INFO, "Pulling filtered frame from filters\n");
         ret = av_buffersink_get_frame(filter->buffersink_ctx,
                                       filter->filtered_frame);
         if (ret < 0) {
@@ -594,22 +590,17 @@ int nspk_media_start(struct nspk_rtp_session_ctx_t *rtp_sess)
 
 	if (!(packet = av_packet_alloc()))
         goto end;
-    av_log(NULL, AV_LOG_INFO, "Allocated AV packet.\n");
 
 	/* read all packets */
     while (!force_quit) {
         if ((ret = av_read_frame(ifmt_ctx, packet)) < 0)
             break;
         stream_index = packet->stream_index;
-        av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u%s\n",
-                stream_index, (stream_index != TARGET_INPUT_STREAM) ? "(Ignoring)" : "");
         if (stream_index != TARGET_INPUT_STREAM)
             continue;
 
         if (filter_ctx[stream_index].filter_graph) {
             struct stream_ctx_t *stream = &stream_ctx[stream_index];
-
-            av_log(NULL, AV_LOG_DEBUG, "Going to reencode&filter the frame\n");
 
             av_packet_rescale_ts(packet,
                                  ifmt_ctx->streams[stream_index]->time_base,
@@ -630,8 +621,6 @@ int nspk_media_start(struct nspk_rtp_session_ctx_t *rtp_sess)
                 }
 
                 stream->dec_frame->pts = stream->dec_frame->best_effort_timestamp;
-				// TODO:
-				// This function should perform TLDK UDP send.
                 ret = filter_encode_write_frame(stream->dec_frame, stream_index);
                 if (ret < 0) {
                     av_log(NULL, AV_LOG_ERROR, "filter_encode_write_frame(): ret=%d\n", ret);
@@ -651,7 +640,6 @@ int nspk_media_start(struct nspk_rtp_session_ctx_t *rtp_sess)
             }
         }
         av_packet_unref(packet);
-        av_log(NULL, AV_LOG_INFO, "Transcoded a packet.\n");
     } // while(1)
 
     av_log(NULL, AV_LOG_DEBUG, "%s: Stopping stream.\n", __FUNCTION__);
