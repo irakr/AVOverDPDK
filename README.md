@@ -1,4 +1,4 @@
-## NSPKCore
+## AVOverDPDK
 
 Enabling RTP, RTSP and other network streaming through kernel bypass using DPDK, TLDK and FFmpeg.
 
