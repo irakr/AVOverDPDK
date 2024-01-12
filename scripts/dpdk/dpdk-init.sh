@@ -3,9 +3,9 @@
 source ./my-dpdk.sh
 
 # Huge page config
-dpdk-hugepages.py --clear
-dpdk-hugepages.py --setup $HUGE_PAGE_SIZE
-dpdk-hugepages.py --show
+./bak/dpdk-hugepages.py --clear
+./bak/dpdk-hugepages.py --setup $HUGE_PAGE_SIZE
+./bak/dpdk-hugepages.py --show
 
 ip link set dev $ETH_INTERFACE down && \
 modprobe uio && \

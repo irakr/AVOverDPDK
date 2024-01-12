@@ -1,3 +1,7 @@
+# Build directories and files
+build
+.*.done
+
 # Prerequisites
 *.d
 
@@ -50,3 +54,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Log files
+*.log
+
+# IDE files
+.vscode
+
